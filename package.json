@@ -1,0 +1,37 @@
+{
+  "name": "robust-ai-scaffold",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Resilient monorepo scaffold with durable planning state",
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start-here": "node infra/scripts/start-here.mjs",
+    "setup": "node infra/scripts/project-intake.mjs",
+    "kickoff": "node infra/scripts/project-intake.mjs",
+    "talk": "node infra/scripts/project-intake.mjs",
+    "init:project": "node infra/scripts/init-project.mjs",
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:intake-resume": "node test/e2e/intake-resume.e2e.mjs",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml,yaml}\"",
+    "health": "node infra/scripts/health-check.mjs",
+    "plan:status": "node infra/scripts/print-planning-state.mjs",
+    "work": "node infra/scripts/autopilot-start.mjs",
+    "autopilot:start": "node infra/scripts/autopilot-start.mjs",
+    "autopilot:configure": "node infra/scripts/autopilot-configure.mjs",
+    "autopilot:stop": "node infra/scripts/autopilot-stop.mjs",
+    "autopilot:status": "node infra/scripts/autopilot-status.mjs",
+    "autopilot:doctor": "node infra/scripts/autopilot-doctor.mjs"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.8",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+.pnpm-store/
+test-results/
+playwright-report/
+.autopilot/.stop
+.autopilot/state.json
+.autopilot/logs/*.log
+.autopilot/logs/*.txt
+.intake/state.json
+.env
+.env.*
+!.env.example
+.DS_Store

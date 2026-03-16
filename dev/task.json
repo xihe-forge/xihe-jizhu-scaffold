@@ -1,0 +1,60 @@
+{
+  "project": "robust-ai-scaffold",
+  "version": "0.1.0",
+  "created_at": "2026-03-16",
+  "updated_at": "2026-03-16",
+  "tasks": [
+    {
+      "id": "T001",
+      "phase": "Phase 1: Project Customization",
+      "type": "planning",
+      "name": "Customize project identity",
+      "description": "Replace scaffold naming, target users, and product statement.",
+      "priority": "P0",
+      "status": "todo",
+      "assignee": "owner",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "README updated with project name",
+        "PROJECT.md customized",
+        "STATE.md reflects the chosen direction"
+      ]
+    },
+    {
+      "id": "T002",
+      "phase": "Phase 1: Project Customization",
+      "type": "planning",
+      "name": "Choose app stack",
+      "description": "Decide whether web and api will use placeholder TypeScript, React, NestJS, or another stack.",
+      "priority": "P0",
+      "status": "todo",
+      "assignee": "owner",
+      "depends_on": [
+        "T001"
+      ],
+      "acceptance_criteria": [
+        "Web stack captured",
+        "API stack captured",
+        "Initial dependencies identified"
+      ]
+    },
+    {
+      "id": "T003",
+      "phase": "Phase 1: Project Customization",
+      "type": "docs",
+      "name": "Write the first milestone",
+      "description": "Turn the initial idea into a milestone with a smallest useful slice.",
+      "priority": "P1",
+      "status": "todo",
+      "assignee": "owner",
+      "depends_on": [
+        "T001"
+      ],
+      "acceptance_criteria": [
+        "Milestone 1 defined",
+        "At least one phase file updated",
+        "Acceptance checks documented"
+      ]
+    }
+  ]
+}
