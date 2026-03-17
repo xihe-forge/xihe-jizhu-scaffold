@@ -196,7 +196,12 @@ function buildPrompt(readyTasks, config) {
       "5. Update dev/task.json — set ALL completed tasks to done.",
       "6. Update dev/progress.txt with what was accomplished for each task.",
       "7. Update .planning/STATE.md.",
-      "8. Git commit all final changes together."
+      "8. Git commit all final changes together.",
+      "",
+      "## Deviation Rules",
+      "If you encounter unexpected situations during execution, follow AGENTS.md deviation rules:",
+      "- D1-D3 (cosmetic, missing dep, unrelated test failure): Auto-fix and log in progress.txt",
+      "- D4-D5 (ambiguous requirement, architectural decision): STOP immediately, mark task as blocked in task.json, log reason in STATE.md"
     ].join("\n");
   }
 
@@ -234,7 +239,12 @@ function buildPrompt(readyTasks, config) {
       "6. Update dev/task.json (set status to done).",
       "7. Update dev/progress.txt with what was accomplished.",
       "8. Update .planning/STATE.md if any decisions were made.",
-      "9. Git commit all final changes together."
+      "9. Git commit all final changes together.",
+      "",
+      "## Deviation Rules",
+      "If you encounter unexpected situations during execution, follow AGENTS.md deviation rules:",
+      "- D1-D3 (cosmetic, missing dep, unrelated test failure): Auto-fix and log in progress.txt",
+      "- D4-D5 (ambiguous requirement, architectural decision): STOP immediately, mark task as blocked in task.json, log reason in STATE.md"
     ].join("\n");
   }
 
@@ -249,7 +259,8 @@ function buildPrompt(readyTasks, config) {
     "Guardrails:",
     "1. Do not invent large new scope.",
     "2. Keep tasks small and verifiable.",
-    "3. Prefer planning the next slice over making risky assumptions."
+    "3. Prefer planning the next slice over making risky assumptions.",
+    "4. Follow deviation rules in AGENTS.md (D1-D3: auto-fix and log, D4-D5: STOP and mark blocked)."
   ].join("\n");
 }
 

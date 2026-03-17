@@ -75,7 +75,7 @@
       "name": "Add deviation handling rules to autopilot prompt",
       "description": "Inspired by GSD's R1-R4 deviation rules. When the AI encounters unplanned work during execution, it needs clear rules: R1-R3 severity auto-fix and log, R4+ severity stop and surface to user.",
       "priority": "P1",
-      "status": "todo",
+      "status": "done",
       "assignee": "opus",
       "depends_on": [],
       "acceptance_criteria": [
@@ -91,7 +91,7 @@
       "name": "Add rationalization blockers to review recipe",
       "description": "Inspired by Superpowers' rationalization blockers table. Prevent AI from skipping tests, deferring error handling, or reducing scope. Add explicit blockers to the review checklist.",
       "priority": "P1",
-      "status": "todo",
+      "status": "done",
       "assignee": "opus",
       "depends_on": [],
       "acceptance_criteria": [
@@ -123,7 +123,7 @@
       "name": "Add two-stage review (spec compliance + code quality)",
       "description": "Inspired by Superpowers' two-stage review. Stage 1: check if the implementation matches the spec/acceptance criteria. Stage 2: check code quality, patterns, security. Currently our review is a single pass.",
       "priority": "P2",
-      "status": "todo",
+      "status": "done",
       "assignee": "opus",
       "depends_on": ["T006"],
       "acceptance_criteria": [
@@ -187,7 +187,7 @@
       "name": "Write architecture decision records (ADRs)",
       "description": "Document WHY we chose each design decision: two-tier Opus/Sonnet model, worktree isolation, quota self-healing, additive-only adopt.",
       "priority": "P2",
-      "status": "todo",
+      "status": "done",
       "assignee": "opus",
       "depends_on": [],
       "acceptance_criteria": [
