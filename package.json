@@ -29,7 +29,8 @@
     "autopilot:stop": "node infra/scripts/autopilot-stop.mjs",
     "autopilot:status": "node infra/scripts/autopilot-status.mjs",
     "autopilot:doctor": "node infra/scripts/autopilot-doctor.mjs",
-    "adopt": "node infra/scripts/adopt-project.mjs"
+    "adopt": "node infra/scripts/adopt-project.mjs",
+    "nyquist": "node infra/scripts/nyquist-check.mjs"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

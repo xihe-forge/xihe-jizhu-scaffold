@@ -79,9 +79,18 @@
       "assignee": "opus",
       "depends_on": [],
       "acceptance_criteria": [
-        "Deviation rules documented in AGENTS.md",
-        "buildPrompt() includes deviation handling instructions",
-        "Rules cover: missing deps, broken tests, scope creep, ambiguous requirements"
+        {
+          "text": "Deviation rules documented in AGENTS.md",
+          "tested_by": "test/integration/agents-md.test.mjs"
+        },
+        {
+          "text": "buildPrompt() includes deviation handling instructions",
+          "tested_by": "test/unit/autopilot-start.test.mjs"
+        },
+        {
+          "text": "Rules cover: missing deps, broken tests, scope creep, ambiguous requirements",
+          "tested_by": "test/unit/autopilot-start.test.mjs"
+        }
       ]
     },
     {
