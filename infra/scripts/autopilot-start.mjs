@@ -222,6 +222,8 @@ function buildPrompt(readyTasks, config) {
 
   if (task) {
     const criteria = (task.acceptance_criteria ?? []).map((item) => `- ${item}`).join("\n");
+    const smallThreshold = config.scaleThresholds?.small ?? 2;
+    const mediumThreshold = config.scaleThresholds?.medium ?? 5;
     return [
       sharedHeader,
       "## Current Task",
@@ -233,6 +235,12 @@ function buildPrompt(readyTasks, config) {
       "",
       "Acceptance criteria:",
       criteria || "- (none provided)",
+      "",
+      "## Scale-Based Execution",
+      "Before implementing, estimate how many files this task will touch:",
+      `- 1-${smallThreshold} files (small): Execute directly with a single Sonnet agent`,
+      `- ${smallThreshold + 1}-${mediumThreshold} files (medium): Write a brief plan first, then execute`,
+      `- ${mediumThreshold + 1}+ files (large): MUST decompose into smaller subtasks before executing`,
       "",
       "## Execution Strategy",
       "You are the Opus orchestrator. Follow this workflow:",

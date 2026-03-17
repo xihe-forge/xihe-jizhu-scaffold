@@ -118,6 +118,10 @@ export const DEFAULT_AUTOPILOT_CONFIG = {
   behavior: {
     allowTaskGenerationWhenIdle: true,
     updateStateAfterEachRound: true
+  },
+  scaleThresholds: {
+    small: 2,
+    medium: 5
   }
 };
 
