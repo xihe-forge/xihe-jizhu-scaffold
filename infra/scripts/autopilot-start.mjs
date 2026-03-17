@@ -91,6 +91,51 @@ function getNextTask() {
   return null;
 }
 
+export function detectCycles(tasks) {
+  const WHITE = 0;
+  const GRAY = 1;
+  const BLACK = 2;
+  const color = new Map(tasks.map((t) => [t.id, WHITE]));
+  const parent = new Map();
+  const cycles = [];
+
+  function dfs(taskId) {
+    color.set(taskId, GRAY);
+    const task = tasks.find((t) => t.id === taskId);
+    const deps = task?.depends_on ?? [];
+    for (const depId of deps) {
+      if (!color.has(depId)) {
+        continue;
+      }
+      if (color.get(depId) === GRAY) {
+        const cycle = [depId];
+        let current = taskId;
+        while (current !== depId) {
+          cycle.unshift(current);
+          current = parent.get(current);
+          if (current === undefined) {
+            break;
+          }
+        }
+        cycle.push(depId);
+        cycles.push(cycle);
+      } else if (color.get(depId) === WHITE) {
+        parent.set(depId, taskId);
+        dfs(depId);
+      }
+    }
+    color.set(taskId, BLACK);
+  }
+
+  for (const task of tasks) {
+    if (color.get(task.id) === WHITE) {
+      dfs(task.id);
+    }
+  }
+
+  return cycles;
+}
+
 function getReadyTasks() {
   const tasks = getTasks();
   const ready = [];
@@ -933,12 +978,19 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  saveState({
-    ...loadState(),
-    status: "error",
-    lastError: String(error)
+// Only run main() when executed directly (not when imported for testing)
+const isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"));
+if (isDirectRun) {
+  main().catch((error) => {
+    saveState({
+      ...loadState(),
+      status: "error",
+      lastError: String(error)
+    });
+    console.error(error);
+    process.exit(1);
   });
-  console.error(error);
-  process.exit(1);
-});
+}
+
+// Export for testing
+export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, resolveModel, buildPrompt };

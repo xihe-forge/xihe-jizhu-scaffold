@@ -18,6 +18,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:unit": "node --test test/unit/*.test.mjs",
     "test:intake-resume": "node test/e2e/intake-resume.e2e.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml,yaml}\"",
     "health": "node infra/scripts/health-check.mjs",
