@@ -1,0 +1,44 @@
+name: Forward to Xihe
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [opened]
+  discussion:
+    types: [created]
+  discussion_comment:
+    types: [created]
+
+jobs:
+  forward:
+    runs-on: ubuntu-latest
+    if: >
+      !contains(github.event.sender.login, '[bot]') &&
+      github.event.sender.login != 'github-actions'
+    steps:
+      - name: Forward event to xihe-core
+        env:
+          GH_TOKEN: ${{ secrets.XIHE_DISPATCH_TOKEN }}
+        run: |
+          EVENT_TYPE=""
+          case "${{ github.event_name }}" in
+            issues) EVENT_TYPE="issue_opened" ;;
+            issue_comment) EVENT_TYPE="issue_comment" ;;
+            pull_request) EVENT_TYPE="pr_opened" ;;
+            discussion) EVENT_TYPE="discussion_created" ;;
+            discussion_comment) EVENT_TYPE="discussion_comment" ;;
+          esac
+
+          gh api repos/xihe-forge/xihe-core/dispatches \
+            -f event_type="$EVENT_TYPE" \
+            -f "client_payload[event_name]=${{ github.event_name }}" \
+            -f "client_payload[action]=${{ github.event.action }}" \
+            -f "client_payload[repo]=${{ github.repository }}" \
+            -f "client_payload[number]=${{ github.event.issue.number || github.event.pull_request.number || github.event.discussion.number || '' }}" \
+            -f "client_payload[title]=${{ github.event.issue.title || github.event.pull_request.title || github.event.discussion.title || '' }}" \
+            -f "client_payload[body]=$(echo '${{ toJSON(github.event.issue.body || github.event.comment.body || github.event.pull_request.body || github.event.discussion.body || '') }}' | head -c 2000)" \
+            -f "client_payload[sender]=${{ github.event.sender.login }}" \
+            -f "client_payload[html_url]=${{ github.event.issue.html_url || github.event.pull_request.html_url || github.event.discussion.html_url || '' }}"
