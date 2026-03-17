@@ -74,6 +74,24 @@ Agent(model: 'sonnet', isolation: 'worktree', description: 'implement user API',
 6. **Reviews go to `dev/review/`** with outcomes and action items
 7. **Docs stay aligned** — if implementation changes behavior, update the relevant doc
 
+### Deviation Handling Rules
+
+During execution, agents will encounter unplanned situations. Handle them by severity:
+
+| Level | Situation | Action | Example |
+|-------|-----------|--------|---------|
+| **D1** | Cosmetic / formatting issue | Auto-fix, log in progress.txt | Trailing whitespace, import order |
+| **D2** | Missing dependency or config | Auto-install/create, log in progress.txt | Missing npm package, missing env var stub |
+| **D3** | Failing test unrelated to current task | Fix if trivial (<10 lines), otherwise log as blocker and skip | Pre-existing broken test |
+| **D4** | Ambiguous requirement or scope conflict | **STOP**. Do NOT guess. Log the ambiguity in STATE.md and mark task as blocked | "Should this API be public or internal?" |
+| **D5** | Architectural decision needed | **STOP**. Log in STATE.md, create a planning task, mark current task as blocked | "This needs a new database table" |
+
+**Rules:**
+- D1–D3: Auto-handle and continue. Log what you did in `dev/progress.txt`
+- D4–D5: Stop execution immediately. Never guess on ambiguous requirements or make architectural decisions without approval
+- If in doubt, treat as D4 (stop and ask)
+- Never introduce scope creep to "fix" a deviation — address the minimum, log the rest
+
 ### Delivery Rules
 
 - Complete the task in the smallest useful slice
