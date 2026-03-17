@@ -2,7 +2,7 @@
   "project": "robust-ai-scaffold",
   "version": "0.2.0",
   "created_at": "2026-03-16",
-  "updated_at": "2026-03-17",
+  "updated_at": "2026-03-17T23:00:00Z",
   "tasks": [
     {
       "id": "T001",
@@ -11,7 +11,7 @@
       "name": "Add file locking to task.json and STATE.md",
       "description": "Prevent concurrent autopilot processes from corrupting shared state files. Use proper-lockfile or OS-level flock. GSD solves this with gsd-tools.cjs centralized access; we need equivalent protection.",
       "priority": "P0",
-      "status": "todo",
+      "status": "done",
       "assignee": "sonnet",
       "depends_on": [],
       "acceptance_criteria": [
@@ -27,7 +27,7 @@
       "name": "Add circular dependency detection in getReadyTasks",
       "description": "If tasks form a cycle (A→B→C→A), all become permanently blocked with no warning. Add cycle detection using DFS/topological sort and surface the error clearly.",
       "priority": "P0",
-      "status": "todo",
+      "status": "done",
       "assignee": "sonnet",
       "depends_on": [],
       "acceptance_criteria": [
@@ -43,7 +43,7 @@
       "name": "Add task execution timeout",
       "description": "A hung sub-agent can block the autopilot indefinitely. Add configurable per-task timeout (default 30min) that kills the process and marks the task as failed with retry logic.",
       "priority": "P1",
-      "status": "todo",
+      "status": "done",
       "assignee": "sonnet",
       "depends_on": [],
       "acceptance_criteria": [
@@ -59,7 +59,7 @@
       "name": "Replace regex quota detection with structured error parsing",
       "description": "Current quota detection uses fragile string matching (indexOf for '429', 'rate limit', etc). Parse structured error responses from Claude/Codex APIs when available, fall back to regex only for unknown formats.",
       "priority": "P1",
-      "status": "todo",
+      "status": "done",
       "assignee": "sonnet",
       "depends_on": [],
       "acceptance_criteria": [
@@ -116,7 +116,7 @@
       "name": "Add requirement-to-test traceability (Nyquist validation)",
       "description": "Inspired by GSD's Nyquist principle: every requirement must map to at least one automated test. Add a verification step that checks acceptance_criteria coverage before marking a task as done.",
       "priority": "P2",
-      "status": "todo",
+      "status": "done",
       "assignee": "sonnet",
       "depends_on": ["T006"],
       "acceptance_criteria": [
@@ -148,7 +148,7 @@
       "name": "Add CLI dashboard for autopilot monitoring",
       "description": "Real-time terminal dashboard showing: current task, sub-agent status, quota health, task progress bar, recent log entries.",
       "priority": "P2",
-      "status": "todo",
+      "status": "done",
       "assignee": "sonnet",
       "depends_on": ["T003"],
       "acceptance_criteria": [
@@ -164,7 +164,7 @@
       "name": "Add scale-based task decomposition hints",
       "description": "Inspired by Workflows' scale-based dispatch. When a task touches many files, the prompt should instruct Opus to decompose it. Add file-count heuristics: 1-2 files=small (direct), 3-5=medium (plan first), 6+=large (must decompose).",
       "priority": "P2",
-      "status": "todo",
+      "status": "done",
       "assignee": "sonnet",
       "depends_on": ["T005"],
       "acceptance_criteria": [
@@ -180,7 +180,7 @@
       "name": "Add unit tests for autopilot-start.mjs core functions",
       "description": "Core autopilot loop has zero unit tests. Add tests for: getTasks(), getReadyTasks(), getTaskProgressSummary(), detectFailureCategory(), resolveModel(), buildPrompt() in all 3 modes.",
       "priority": "P1",
-      "status": "todo",
+      "status": "done",
       "assignee": "sonnet",
       "depends_on": [],
       "acceptance_criteria": [
