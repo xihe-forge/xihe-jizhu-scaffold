@@ -1,0 +1,17 @@
+{
+  "name": "@robust-ai-scaffold/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@robust-ai-scaffold/shared": "workspace:*",
+    "@robust-ai-scaffold/types": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "node -e \"console.log('No lint configured yet for @robust-ai-scaffold/api')\"",
+    "test": "node -e \"console.log('No tests configured yet for @robust-ai-scaffold/api')\""
+  }
+}

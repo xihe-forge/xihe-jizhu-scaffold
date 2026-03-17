@@ -1,0 +1,101 @@
+{
+  "runner": {
+    "mode": "claude",
+    "profiles": {
+      "claude": {
+        "displayName": "Claude Code CLI",
+        "command": "claude",
+        "supportsResume": true,
+        "promptTransport": "stdin",
+        "outputParser": "claude-stream-json",
+        "doctorArgs": [
+          "--help"
+        ],
+        "permissionMode": "bypassPermissions",
+        "newSessionArgs": [
+          "-p",
+          "--permission-mode",
+          "{{permissionMode}}",
+          "--model",
+          "{{model}}",
+          "--output-format",
+          "stream-json",
+          "--verbose",
+          "--session-id",
+          "{{sessionId}}"
+        ],
+        "resumeSessionArgs": [
+          "-p",
+          "--permission-mode",
+          "{{permissionMode}}",
+          "--model",
+          "{{model}}",
+          "--output-format",
+          "stream-json",
+          "--verbose",
+          "--resume",
+          "{{sessionId}}"
+        ]
+      },
+      "codex": {
+        "displayName": "OpenAI Codex CLI",
+        "command": "codex",
+        "supportsResume": true,
+        "promptTransport": "argument",
+        "outputParser": "codex-jsonl",
+        "doctorArgs": [
+          "--help"
+        ],
+        "sandboxMode": "workspace-write",
+        "skipGitRepoCheck": true,
+        "newSessionArgs": [
+          "exec",
+          "--json",
+          "--full-auto",
+          "--skip-git-repo-check",
+          "--sandbox",
+          "{{sandboxMode}}",
+          "--model",
+          "{{model}}",
+          "{{prompt}}"
+        ],
+        "resumeSessionArgs": [
+          "exec",
+          "resume",
+          "{{sessionId}}",
+          "--json",
+          "--full-auto",
+          "--skip-git-repo-check",
+          "--sandbox",
+          "{{sandboxMode}}",
+          "--model",
+          "{{model}}",
+          "{{prompt}}"
+        ]
+      },
+      "custom": {
+        "displayName": "Custom AI command",
+        "command": "",
+        "supportsResume": false,
+        "promptTransport": "stdin",
+        "outputParser": "plain-text",
+        "doctorArgs": [],
+        "newSessionArgs": [],
+        "resumeSessionArgs": []
+      }
+    }
+  },
+  "models": {
+    "planning": "opus",
+    "execution": "sonnet"
+  },
+  "loop": {
+    "waitMinutes": 30,
+    "maxRetries": 12,
+    "heartbeatSeconds": 10
+  },
+  "behavior": {
+    "allowTaskGenerationWhenIdle": true,
+    "updateStateAfterEachRound": true
+  }
+}

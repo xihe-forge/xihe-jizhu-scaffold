@@ -1,0 +1,209 @@
+{
+  "project": "robust-ai-scaffold",
+  "version": "0.2.0",
+  "created_at": "2026-03-16",
+  "updated_at": "2026-03-17T23:00:00Z",
+  "tasks": [
+    {
+      "id": "T001",
+      "phase": "Phase 1: Robustness",
+      "type": "backend",
+      "name": "Add file locking to task.json and STATE.md",
+      "description": "Prevent concurrent autopilot processes from corrupting shared state files. Use proper-lockfile or OS-level flock. GSD solves this with gsd-tools.cjs centralized access; we need equivalent protection.",
+      "priority": "P0",
+      "status": "done",
+      "assignee": "sonnet",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "readJson/writeJson acquire a lockfile before read-modify-write",
+        "Lock auto-releases on process exit or crash",
+        "Concurrent test: two simultaneous writes do not corrupt task.json"
+      ]
+    },
+    {
+      "id": "T002",
+      "phase": "Phase 1: Robustness",
+      "type": "backend",
+      "name": "Add circular dependency detection in getReadyTasks",
+      "description": "If tasks form a cycle (A→B→C→A), all become permanently blocked with no warning. Add cycle detection using DFS/topological sort and surface the error clearly.",
+      "priority": "P0",
+      "status": "done",
+      "assignee": "sonnet",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "getReadyTasks() detects cycles and logs a clear error",
+        "Affected task IDs are listed in the warning",
+        "Cycle does not silently block the autopilot loop"
+      ]
+    },
+    {
+      "id": "T003",
+      "phase": "Phase 1: Robustness",
+      "type": "backend",
+      "name": "Add task execution timeout",
+      "description": "A hung sub-agent can block the autopilot indefinitely. Add configurable per-task timeout (default 30min) that kills the process and marks the task as failed with retry logic.",
+      "priority": "P1",
+      "status": "done",
+      "assignee": "sonnet",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Timeout configurable in .autopilot/config.json (default 1800s)",
+        "Timed-out tasks get status 'failed' with reason in progress.txt",
+        "Failed tasks can be retried up to max_retries (default 2)"
+      ]
+    },
+    {
+      "id": "T004",
+      "phase": "Phase 1: Robustness",
+      "type": "backend",
+      "name": "Replace regex quota detection with structured error parsing",
+      "description": "Current quota detection uses fragile string matching (indexOf for '429', 'rate limit', etc). Parse structured error responses from Claude/Codex APIs when available, fall back to regex only for unknown formats.",
+      "priority": "P1",
+      "status": "done",
+      "assignee": "sonnet",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Structured JSON error responses are parsed first",
+        "Regex fallback only for unstructured stderr output",
+        "Unit tests cover both structured and unstructured quota errors"
+      ]
+    },
+    {
+      "id": "T005",
+      "phase": "Phase 2: Quality Gates",
+      "type": "backend",
+      "name": "Add deviation handling rules to autopilot prompt",
+      "description": "Inspired by GSD's R1-R4 deviation rules. When the AI encounters unplanned work during execution, it needs clear rules: R1-R3 severity auto-fix and log, R4+ severity stop and surface to user.",
+      "priority": "P1",
+      "status": "done",
+      "assignee": "opus",
+      "depends_on": [],
+      "acceptance_criteria": [
+        {
+          "text": "Deviation rules documented in AGENTS.md",
+          "tested_by": "test/integration/agents-md.test.mjs"
+        },
+        {
+          "text": "buildPrompt() includes deviation handling instructions",
+          "tested_by": "test/unit/autopilot-start.test.mjs"
+        },
+        {
+          "text": "Rules cover: missing deps, broken tests, scope creep, ambiguous requirements",
+          "tested_by": "test/unit/autopilot-start.test.mjs"
+        }
+      ]
+    },
+    {
+      "id": "T006",
+      "phase": "Phase 2: Quality Gates",
+      "type": "backend",
+      "name": "Add rationalization blockers to review recipe",
+      "description": "Inspired by Superpowers' rationalization blockers table. Prevent AI from skipping tests, deferring error handling, or reducing scope. Add explicit blockers to the review checklist.",
+      "priority": "P1",
+      "status": "done",
+      "assignee": "opus",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Review recipe includes rationalization blocker table",
+        "At least 5 common rationalization patterns are blocked",
+        "Review prompt explicitly checks for these patterns"
+      ]
+    },
+    {
+      "id": "T007",
+      "phase": "Phase 2: Quality Gates",
+      "type": "backend",
+      "name": "Add requirement-to-test traceability (Nyquist validation)",
+      "description": "Inspired by GSD's Nyquist principle: every requirement must map to at least one automated test. Add a verification step that checks acceptance_criteria coverage before marking a task as done.",
+      "priority": "P2",
+      "status": "done",
+      "assignee": "sonnet",
+      "depends_on": ["T006"],
+      "acceptance_criteria": [
+        "Each acceptance criterion in task.json links to a test file or test name",
+        "Verification script checks coverage before task completion",
+        "Uncovered criteria are surfaced as warnings"
+      ]
+    },
+    {
+      "id": "T008",
+      "phase": "Phase 2: Quality Gates",
+      "type": "backend",
+      "name": "Add two-stage review (spec compliance + code quality)",
+      "description": "Inspired by Superpowers' two-stage review. Stage 1: check if the implementation matches the spec/acceptance criteria. Stage 2: check code quality, patterns, security. Currently our review is a single pass.",
+      "priority": "P2",
+      "status": "done",
+      "assignee": "opus",
+      "depends_on": ["T006"],
+      "acceptance_criteria": [
+        "Review recipe split into Stage 1 (spec) and Stage 2 (quality)",
+        "Stage 1 failure blocks Stage 2",
+        "Both stages produce structured output in dev/review/"
+      ]
+    },
+    {
+      "id": "T009",
+      "phase": "Phase 3: Developer Experience",
+      "type": "backend",
+      "name": "Add CLI dashboard for autopilot monitoring",
+      "description": "Real-time terminal dashboard showing: current task, sub-agent status, quota health, task progress bar, recent log entries.",
+      "priority": "P2",
+      "status": "done",
+      "assignee": "sonnet",
+      "depends_on": ["T003"],
+      "acceptance_criteria": [
+        "pnpm autopilot:status shows live dashboard",
+        "Dashboard refreshes every 5 seconds",
+        "Shows: active task, quota status, progress (done/total), last 5 log entries"
+      ]
+    },
+    {
+      "id": "T010",
+      "phase": "Phase 3: Developer Experience",
+      "type": "backend",
+      "name": "Add scale-based task decomposition hints",
+      "description": "Inspired by Workflows' scale-based dispatch. When a task touches many files, the prompt should instruct Opus to decompose it. Add file-count heuristics: 1-2 files=small (direct), 3-5=medium (plan first), 6+=large (must decompose).",
+      "priority": "P2",
+      "status": "done",
+      "assignee": "sonnet",
+      "depends_on": ["T005"],
+      "acceptance_criteria": [
+        "buildPrompt() includes scale-based decomposition guidance",
+        "Large tasks automatically get a decomposition step before execution",
+        "Scale thresholds configurable in .autopilot/config.json"
+      ]
+    },
+    {
+      "id": "T011",
+      "phase": "Phase 3: Developer Experience",
+      "type": "testing",
+      "name": "Add unit tests for autopilot-start.mjs core functions",
+      "description": "Core autopilot loop has zero unit tests. Add tests for: getTasks(), getReadyTasks(), getTaskProgressSummary(), detectFailureCategory(), resolveModel(), buildPrompt() in all 3 modes.",
+      "priority": "P1",
+      "status": "done",
+      "assignee": "sonnet",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Test file: test/unit/autopilot-start.test.mjs",
+        "Coverage: getTasks, getReadyTasks, getTaskProgressSummary, detectFailureCategory, resolveModel, buildPrompt",
+        "All tests pass"
+      ]
+    },
+    {
+      "id": "T012",
+      "phase": "Phase 3: Developer Experience",
+      "type": "docs",
+      "name": "Write architecture decision records (ADRs)",
+      "description": "Document WHY we chose each design decision: two-tier Opus/Sonnet model, worktree isolation, quota self-healing, additive-only adopt.",
+      "priority": "P2",
+      "status": "done",
+      "assignee": "opus",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "docs/adr/ directory with at least 4 ADRs",
+        "Each ADR follows standard format: context, decision, consequences",
+        "ADRs cover: model hierarchy, worktree isolation, quota handling, adopt flow"
+      ]
+    }
+  ]
+}
