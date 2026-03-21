@@ -144,6 +144,7 @@ pnpm autopilot:status    # Show autopilot status
 pnpm autopilot:stop      # Stop the autopilot gracefully
 pnpm autopilot:doctor    # Diagnose autopilot issues
 pnpm nyquist             # Run Nyquist validation check
+pnpm skill:update        # Update skill submodules to latest remote
 pnpm test:unit           # Run unit tests (node --test)
 pnpm dev                 # Start dev servers (turbo)
 pnpm build               # Build all packages (turbo)

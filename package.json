@@ -30,7 +30,9 @@
     "autopilot:status": "node infra/scripts/autopilot-status.mjs",
     "autopilot:doctor": "node infra/scripts/autopilot-doctor.mjs",
     "adopt": "node infra/scripts/adopt-project.mjs",
-    "nyquist": "node infra/scripts/nyquist-check.mjs"
+    "nyquist": "node infra/scripts/nyquist-check.mjs",
+    "postinstall": "git submodule update --init --recursive",
+    "skill:update": "git submodule update --remote --merge"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
