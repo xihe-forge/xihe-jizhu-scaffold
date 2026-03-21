@@ -1,0 +1,33 @@
+{
+  "name": "Full-Stack Application",
+  "description": "Frontend + Backend with shared types",
+  "recommended_skills": ["impeccable", "vercel-web-design"],
+  "review_gates": {
+    "mrd_prd_review": true,
+    "tech_design_review": true,
+    "code_review": true,
+    "test_coverage_review": true,
+    "marketing_review": false
+  },
+  "optional_modules": {
+    "payment": { "enabled": false }
+  },
+  "discipline": {
+    "tdd_default": true,
+    "code_review_required": true
+  },
+  "suggested_phases": [
+    "Shared Types & API Contract",
+    "Backend Core",
+    "Frontend Shell & Routing",
+    "Feature Implementation",
+    "Integration & Polish"
+  ],
+  "starter_tasks": [
+    { "name": "Define shared types and API contract", "type": "planning", "priority": "P0" },
+    { "name": "Implement backend API endpoints", "type": "feature", "priority": "P0" },
+    { "name": "Create frontend app shell with routing", "type": "feature", "priority": "P0" },
+    { "name": "Build core feature pages", "type": "feature", "priority": "P1" },
+    { "name": "Add end-to-end integration tests", "type": "test", "priority": "P1" }
+  ]
+}

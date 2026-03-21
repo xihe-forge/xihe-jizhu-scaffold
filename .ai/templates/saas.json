@@ -1,0 +1,33 @@
+{
+  "name": "SaaS Application",
+  "description": "Full-stack SaaS with auth, billing, dashboard",
+  "recommended_skills": ["impeccable", "vercel-web-design"],
+  "review_gates": {
+    "mrd_prd_review": true,
+    "tech_design_review": true,
+    "code_review": true,
+    "test_coverage_review": true,
+    "marketing_review": true
+  },
+  "optional_modules": {
+    "payment": { "enabled": true }
+  },
+  "discipline": {
+    "tdd_default": true,
+    "code_review_required": true
+  },
+  "suggested_phases": [
+    "Auth & User Management",
+    "Core Features",
+    "Billing & Subscription",
+    "Dashboard & Analytics",
+    "Landing Page & Marketing"
+  ],
+  "starter_tasks": [
+    { "name": "Set up authentication (signup/login/logout)", "type": "feature", "priority": "P0" },
+    { "name": "Create user dashboard layout", "type": "feature", "priority": "P0" },
+    { "name": "Implement payment integration", "type": "feature", "priority": "P1" },
+    { "name": "Build landing page", "type": "feature", "priority": "P1" },
+    { "name": "Add pricing page", "type": "feature", "priority": "P1" }
+  ]
+}

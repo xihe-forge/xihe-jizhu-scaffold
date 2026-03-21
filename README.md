@@ -144,6 +144,9 @@ These commands are available when using Claude Code in the project:
 | `/review [files]` | Code + frontend review |
 | `/design [target]` | Frontend design generation/refinement (impeccable) |
 | `/ux-audit [files]` | Dual UX audit (aesthetic + engineering) |
+| `/security [files]` | OWASP Top 10 + secrets + dependency vulnerability scan |
+| `/deploy-check` | Production deployment readiness check |
+| `/cost [detail]` | Cost and token usage report |
 
 ## External Skill Modules
 
@@ -156,7 +159,28 @@ The scaffold's core architecture (autopilot, intake, review pipeline) is self-co
 
 These two modules are **complementary**: impeccable handles visual aesthetics (anti-AI-slop), Vercel handles engineering standards (a11y, performance, UX). Both are used together for maximum frontend quality.
 
-Skill registry: `.ai/skills/skill-registry.json`
+Skill registry: `.ai/skills/skill-registry.json` — supports dependency chains (`depends_on`) and topological execution ordering.
+
+## Project Templates
+
+The intake wizard offers project type templates to pre-configure the scaffold:
+
+| Template | Review Gates | Payment | TDD |
+|----------|-------------|---------|-----|
+| **SaaS** | All 5 gates on | Enabled | On |
+| **Landing Page** | Code + marketing only | Off | Off |
+| **API-only** | MRD/tech/code/test | Off | On |
+| **Full-stack** | MRD/tech/code/test | Off | On |
+| **Custom** | Manual configuration | — | — |
+
+Templates also provide starter tasks and suggested phases. Select during intake or use one-click mode.
+
+## Cost & Metrics Tracking
+
+The autopilot persistently tracks cost and token usage in `dev/metrics.json`:
+- Per-task: model, input/output tokens, cost USD, duration, status
+- Per-session: cumulative totals
+- View with `/cost` (summary) or `/cost detail` (per-task breakdown)
 
 ## Stage-Based Review Gates
 

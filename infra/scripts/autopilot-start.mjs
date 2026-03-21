@@ -484,9 +484,63 @@ function buildCodexDelegationBlock(task) {
  */
 
 /**
+ * Returns the ordered list of skills for a given execution phase.
+ * Reads execution_order from .ai/skills/skill-registry.json.
+ * @param {string} phase - Phase key: "implement_frontend" | "review_frontend" | "final_review"
+ * @returns {string[]} Ordered array of skill identifiers (e.g. ["impeccable/critique", ...])
+ */
+function getSkillExecutionOrder(phase) {
+  const registry = readJson(".ai/skills/skill-registry.json", null);
+  if (!registry?.execution_order) return [];
+  return registry.execution_order[phase] ?? [];
+}
+
+/**
+ * Topologically sort a list of skill identifiers using depends_on edges from the registry.
+ * Skills with no dependencies come first; dependents come after their prerequisites.
+ * @param {string[]} skillIds - List of "moduleId/skillName" identifiers to sort
+ * @param {object} registry - The parsed skill registry object
+ * @returns {string[]} Topologically sorted list
+ */
+function topoSortSkills(skillIds, registry) {
+  // Build a dependency map from the registry
+  const depMap = new Map();
+  for (const [moduleId, mod] of Object.entries(registry.skills || {})) {
+    for (const [skillName, skill] of Object.entries(mod.skills || {})) {
+      const id = `${moduleId}/${skillName}`;
+      depMap.set(id, skill.depends_on || null);
+    }
+  }
+
+  const visited = new Set();
+  const sorted = [];
+  const inProgress = new Set();
+
+  function visit(id) {
+    if (visited.has(id)) return;
+    if (inProgress.has(id)) return; // cycle guard — skip to avoid infinite loop
+    inProgress.add(id);
+    const dep = depMap.get(id);
+    if (dep && skillIds.includes(dep)) {
+      visit(dep);
+    }
+    inProgress.delete(id);
+    visited.add(id);
+    sorted.push(id);
+  }
+
+  for (const id of skillIds) {
+    visit(id);
+  }
+
+  return sorted;
+}
+
+/**
  * Load external skill instructions based on task type and current phase.
  * Reads .ai/skills/skill-registry.json and returns relevant skill instructions
- * to inject into the prompt.
+ * to inject into the prompt. Skills are sorted topologically by depends_on edges,
+ * and an execution order note is appended to the block.
  * @param {Array} tasks - Current tasks being executed
  * @param {string} phase - Current phase: "implement" | "review" | "final_review"
  * @returns {string} Skill instructions block, or empty string if no skills match
@@ -496,7 +550,6 @@ function loadSkillInstructions(tasks, phase = "implement") {
   if (!registry?.skills) return "";
 
   const taskTags = new Set();
-  const filePatterns = new Set();
   for (const t of tasks) {
     const type = (t.type || "").toLowerCase();
     const name = (t.name || "").toLowerCase();
@@ -509,7 +562,10 @@ function loadSkillInstructions(tasks, phase = "implement") {
 
   if (taskTags.size === 0) return "";
 
-  const parts = [];
+  // Collect all matching skill IDs so we can topo-sort them
+  const matchedSkillIds = [];
+  const matchedModules = [];
+
   for (const [moduleId, mod] of Object.entries(registry.skills)) {
     const trigger = mod.trigger || {};
     const phaseMatch = (trigger.phase || []).includes(phase);
@@ -519,8 +575,31 @@ function loadSkillInstructions(tasks, phase = "implement") {
     const skillEntries = Object.entries(mod.skills || {});
     if (skillEntries.length === 0) continue;
 
-    const skillList = skillEntries
-      .map(([name, skill]) => `  - **${name}**: ${skill.when || ""}  \n    File: \`.ai/skills/${mod.path?.replace(".ai/skills/", "") || moduleId}/${skill.file}\``)
+    matchedModules.push({ moduleId, mod, skillEntries });
+    for (const [skillName] of skillEntries) {
+      matchedSkillIds.push(`${moduleId}/${skillName}`);
+    }
+  }
+
+  if (matchedModules.length === 0) return "";
+
+  // Topologically sort the matched skill IDs
+  const sortedSkillIds = topoSortSkills(matchedSkillIds, registry);
+
+  const parts = [];
+  for (const { moduleId, mod, skillEntries } of matchedModules) {
+    // Re-sort this module's skills according to the topo order
+    const orderedEntries = [...skillEntries].sort((a, b) => {
+      const idxA = sortedSkillIds.indexOf(`${moduleId}/${a[0]}`);
+      const idxB = sortedSkillIds.indexOf(`${moduleId}/${b[0]}`);
+      return idxA - idxB;
+    });
+
+    const skillList = orderedEntries
+      .map(([name, skill]) => {
+        const depNote = skill.depends_on ? ` (after ${skill.depends_on})` : "";
+        return `  - **${name}**${depNote}: ${skill.when || ""}  \n    File: \`.ai/skills/${mod.path?.replace(".ai/skills/", "") || moduleId}/${skill.file}\``;
+      })
       .join("\n");
 
     parts.push(
@@ -542,8 +621,6 @@ function loadSkillInstructions(tasks, phase = "implement") {
     parts.push("");
   }
 
-  if (parts.length === 0) return "";
-
   // Add phase-specific instructions from phase_mapping
   const phaseMap = registry.phase_mapping || {};
   const phaseKey = phase === "implement" ? "implement_frontend"
@@ -557,6 +634,18 @@ function loadSkillInstructions(tasks, phase = "implement") {
     for (const [role, skills] of Object.entries(mapping)) {
       parts.push(`- **${role}**: Read and follow ${skills.join(", ")}`);
     }
+    parts.push("");
+  }
+
+  // Append execution order note for this phase
+  const executionOrderKey = phase === "implement" ? "implement_frontend"
+    : phase === "review" ? "review_frontend"
+    : phase === "final_review" ? "final_review"
+    : null;
+
+  const executionOrder = executionOrderKey ? getSkillExecutionOrder(executionOrderKey) : [];
+  if (executionOrder.length > 0) {
+    parts.push(`Skill execution order for this phase: ${executionOrder.join(" → ")}`);
     parts.push("");
   }
 
@@ -1212,7 +1301,7 @@ function extractCodexToolLabel(item = {}) {
   return item.command ?? item.cmd ?? item.description ?? item.title ?? "";
 }
 
-function handleRunnerLine({ runner, line, outputStream, currentSessionId }) {
+function handleRunnerLine({ runner, line, outputStream, currentSessionId, usageAccum }) {
   try {
     const event = JSON.parse(line);
     let nextSessionId = currentSessionId;
@@ -1244,6 +1333,14 @@ function handleRunnerLine({ runner, line, outputStream, currentSessionId }) {
         console.log(
           `[done] turns=${event.num_turns ?? "?"} cost=${event.total_cost_usd ?? "n/a"} session=${nextSessionId}`
         );
+        // Capture cost and token usage from Claude result event
+        if (usageAccum && event.total_cost_usd != null) {
+          usageAccum.costUsd = Number(event.total_cost_usd) || 0;
+        }
+        if (usageAccum && event.usage) {
+          usageAccum.inputTokens = Number(event.usage.input_tokens) || 0;
+          usageAccum.outputTokens = Number(event.usage.output_tokens) || 0;
+        }
       }
 
       return nextSessionId;
@@ -1274,6 +1371,11 @@ function handleRunnerLine({ runner, line, outputStream, currentSessionId }) {
         console.log(
           `[done] input=${usage.input_tokens ?? "?"} output=${usage.output_tokens ?? "?"} session=${nextSessionId}`
         );
+        // Capture token usage from Codex turn.completed event
+        if (usageAccum) {
+          usageAccum.inputTokens = Number(usage.input_tokens) || 0;
+          usageAccum.outputTokens = Number(usage.output_tokens) || 0;
+        }
       }
 
       if (event.type === "error" && event.message) {
@@ -1307,7 +1409,7 @@ function handleRunnerLine({ runner, line, outputStream, currentSessionId }) {
  * @param {object} options.state - Current autopilot state
  * @param {string|null} options.taskId - Current task ID or null for idle
  * @param {boolean} options.allowResumeFallback - Whether to retry with fresh session on missing session
- * @returns {Promise<{exitCode: number, sessionId: string, failureCategory?: string, retryAfterSeconds?: number, failureHint?: string}>}
+ * @returns {Promise<{exitCode: number, sessionId: string, failureCategory?: string, retryAfterSeconds?: number, failureHint?: string, inputTokens: number, outputTokens: number, costUsd: number}>}
  */
 async function invokeRunner({ prompt, model, config, state, taskId, allowResumeFallback = true }) {
   ensureDir(".autopilot/logs");
@@ -1341,12 +1443,17 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
     console.log(prompt);
     return {
       exitCode: 0,
-      sessionId: state.sessionId || ""
+      sessionId: state.sessionId || "",
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0
     };
   }
 
   const logStream = createWriteStream(".autopilot/logs/autopilot.log", { flags: "a" });
   const outputStream = createWriteStream(".autopilot/logs/assistant-output.log", { flags: "a" });
+  /** Mutable accumulator for usage metrics captured from streamed events */
+  const usageAccum = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
 
   const child = requiresCommandShell(runnerCommand) && runner.promptTransport === "stdin"
     ? spawn(buildShellCommandLine(runnerCommand, args), {
@@ -1414,7 +1521,8 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
       runner,
       line,
       outputStream,
-      currentSessionId: resolvedSessionId
+      currentSessionId: resolvedSessionId,
+      usageAccum
     });
   });
 
@@ -1478,7 +1586,10 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
       exitCode,
       sessionId: resolvedSessionId,
       failureCategory: "timeout",
-      failureHint: `Task execution timed out after ${taskTimeoutSeconds}s`
+      failureHint: `Task execution timed out after ${taskTimeoutSeconds}s`,
+      inputTokens: usageAccum.inputTokens,
+      outputTokens: usageAccum.outputTokens,
+      costUsd: usageAccum.costUsd
     };
   }
 
@@ -1502,8 +1613,98 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
     sessionId: resolvedSessionId,
     failureCategory: failureDetection?.category ?? null,
     retryAfterSeconds: failureDetection?.retryAfterSeconds ?? null,
-    failureHint
+    failureHint,
+    inputTokens: usageAccum.inputTokens,
+    outputTokens: usageAccum.outputTokens,
+    costUsd: usageAccum.costUsd
   };
+}
+
+/**
+ * Append a task's metrics to dev/metrics.json.
+ * Reads the current file (or creates it), finds or creates the current session entry,
+ * appends the task record, updates totals, and writes back atomically.
+ *
+ * @param {object} opts
+ * @param {string} opts.sessionId - UUID for the current autopilot session
+ * @param {string} opts.sessionStartedAt - ISO timestamp when the session started
+ * @param {string} opts.taskId - Task ID (e.g. "T001") or "idle" / "final-review-N"
+ * @param {string} opts.model - Model identifier used for this task
+ * @param {string} opts.startedAt - ISO timestamp when the task invocation began
+ * @param {string} opts.completedAt - ISO timestamp when the task invocation ended
+ * @param {number} opts.durationMs - Wall-clock duration in milliseconds
+ * @param {number} opts.inputTokens - Input tokens consumed
+ * @param {number} opts.outputTokens - Output tokens consumed
+ * @param {number} opts.costUsd - Cost in USD
+ * @param {string} opts.status - "success" | "failed" | "quota_wait" | "timeout"
+ */
+function recordTaskMetrics({ sessionId, sessionStartedAt, taskId, model, startedAt, completedAt, durationMs, inputTokens, outputTokens, costUsd, status }) {
+  ensureDir("dev");
+  const metricsPath = "dev/metrics.json";
+  const data = readJson(metricsPath, { sessions: [] });
+
+  if (!Array.isArray(data.sessions)) {
+    data.sessions = [];
+  }
+
+  // Find or create the current session entry
+  let session = data.sessions.find((s) => s.session_id === sessionId);
+  if (!session) {
+    session = {
+      session_id: sessionId,
+      started_at: sessionStartedAt,
+      tasks: [],
+      totals: {
+        tasks_completed: 0,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        total_cost_usd: 0,
+        total_duration_ms: 0
+      }
+    };
+    data.sessions.push(session);
+  }
+
+  // Append task entry
+  session.tasks.push({
+    task_id: taskId,
+    model,
+    started_at: startedAt,
+    completed_at: completedAt,
+    duration_ms: durationMs,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    cost_usd: costUsd,
+    status
+  });
+
+  // Recompute session totals from all tasks
+  const totals = {
+    tasks_completed: 0,
+    total_input_tokens: 0,
+    total_output_tokens: 0,
+    total_cost_usd: 0,
+    total_duration_ms: 0
+  };
+  for (const t of session.tasks) {
+    if (t.status === "success") {
+      totals.tasks_completed += 1;
+    }
+    totals.total_input_tokens += t.input_tokens ?? 0;
+    totals.total_output_tokens += t.output_tokens ?? 0;
+    totals.total_cost_usd += t.cost_usd ?? 0;
+    totals.total_duration_ms += t.duration_ms ?? 0;
+  }
+  // Round cost to avoid floating-point drift
+  totals.total_cost_usd = Math.round(totals.total_cost_usd * 1e8) / 1e8;
+  session.totals = totals;
+
+  try {
+    writeJson(metricsPath, data);
+  } catch (err) {
+    // Non-fatal: metrics write failure should never crash the autopilot
+    console.warn(`[metrics] Failed to write dev/metrics.json: ${err.message}`);
+  }
 }
 
 async function main() {
@@ -1531,6 +1732,9 @@ async function main() {
   }
 
   clearStopSignal();
+
+  const metricsSessionId = randomUUID();
+  const metricsSessionStartedAt = new Date().toISOString();
 
   const state = loadState();
 
@@ -1613,6 +1817,29 @@ async function main() {
     const model = resolveModel(task, config);
     const prompt = buildPrompt(readyTasks, config);
 
+    // Log which skills were injected for this task
+    if (task) {
+      const registry = readJson(".ai/skills/skill-registry.json", null);
+      if (registry?.skills) {
+        const injectedSkillIds = [];
+        for (const [moduleId, mod] of Object.entries(registry.skills)) {
+          for (const [skillName, skillDef] of Object.entries(mod.skills || {})) {
+            const skillId = `${moduleId}/${skillName}`;
+            if (skillDef.file && prompt.includes(skillDef.file)) {
+              injectedSkillIds.push(skillId);
+            }
+          }
+        }
+        if (injectedSkillIds.length > 0) {
+          appendFileSync(
+            "dev/progress.txt",
+            `[SKILLS] Task ${task.id}: injected ${injectedSkillIds.length} skills (${injectedSkillIds.join(", ")})\n`,
+            "utf8"
+          );
+        }
+      }
+    }
+
     saveState({
       ...currentState,
       status: "running",
@@ -1631,12 +1858,42 @@ async function main() {
     console.log(`Runner: ${renderRunnerSummary(config)}`);
     console.log(`Model: ${model}`);
 
+    const taskStartTime = Date.now();
+    const taskStartedAt = new Date(taskStartTime).toISOString();
+
     const result = await invokeRunner({
       prompt,
       model,
       config,
       state: loadState(),
       taskId: task?.id ?? null
+    });
+
+    const taskEndTime = Date.now();
+    const taskCompletedAt = new Date(taskEndTime).toISOString();
+    const taskDurationMs = taskEndTime - taskStartTime;
+
+    // Record metrics for this invocation (success or failure)
+    const taskMetricsStatus = result.exitCode === 0
+      ? "success"
+      : result.failureCategory === "quota"
+        ? "quota_wait"
+        : result.failureCategory === "timeout"
+          ? "timeout"
+          : "failed";
+
+    recordTaskMetrics({
+      sessionId: metricsSessionId,
+      sessionStartedAt: metricsSessionStartedAt,
+      taskId: task?.id ?? "idle",
+      model,
+      startedAt: taskStartedAt,
+      completedAt: taskCompletedAt,
+      durationMs: taskDurationMs,
+      inputTokens: result.inputTokens ?? 0,
+      outputTokens: result.outputTokens ?? 0,
+      costUsd: result.costUsd ?? 0,
+      status: taskMetricsStatus
     });
 
     if (result.failureCategory === "timeout") {
@@ -1774,12 +2031,30 @@ async function main() {
             console.log(`Runner: ${renderRunnerSummary(config)}`);
             console.log(`Model: ${reviewModel}`);
 
+            const reviewStartTime = Date.now();
+            const reviewStartedAt = new Date(reviewStartTime).toISOString();
+
             const reviewResult = await invokeRunner({
               prompt: reviewPrompt,
               model: reviewModel,
               config,
               state: loadState(),
               taskId: `final-review-${reviewRound}`
+            });
+
+            const reviewEndTime = Date.now();
+            recordTaskMetrics({
+              sessionId: metricsSessionId,
+              sessionStartedAt: metricsSessionStartedAt,
+              taskId: `final-review-${reviewRound}`,
+              model: reviewModel,
+              startedAt: reviewStartedAt,
+              completedAt: new Date(reviewEndTime).toISOString(),
+              durationMs: reviewEndTime - reviewStartTime,
+              inputTokens: reviewResult.inputTokens ?? 0,
+              outputTokens: reviewResult.outputTokens ?? 0,
+              costUsd: reviewResult.costUsd ?? 0,
+              status: reviewResult.exitCode === 0 ? "success" : reviewResult.failureCategory === "quota" ? "quota_wait" : "failed"
             });
 
             if (reviewResult.exitCode === 0) {
@@ -1925,4 +2200,4 @@ if (isDirectRun) {
 }
 
 // Export for testing
-export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds, loadSkillInstructions };
+export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds, loadSkillInstructions, getSkillExecutionOrder };

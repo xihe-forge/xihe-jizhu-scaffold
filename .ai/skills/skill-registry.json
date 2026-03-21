@@ -2,8 +2,24 @@
   "version": "1.0.0",
   "description": "External skill modules registry. Autopilot uses this to determine which skills to invoke at each phase.",
 
+  "execution_order": {
+    "implement_frontend": ["impeccable/frontend-design"],
+    "review_frontend": [
+      "impeccable/critique",
+      "vercel-web-design/web-design-guidelines",
+      "impeccable/audit",
+      "impeccable/normalize",
+      "impeccable/polish"
+    ],
+    "final_review": [
+      "impeccable/audit",
+      "vercel-web-design/web-design-guidelines"
+    ]
+  },
+
   "skills": {
     "impeccable": {
+      "version": "1.0.0",
       "description": "Frontend design generation and iterative refinement. Anti-AI-slop aesthetics.",
       "source": "https://github.com/garkgodwin/impeccable",
       "license": "Apache 2.0",
@@ -29,7 +45,8 @@
         "polish": {
           "file": "polish.md",
           "role": "design_refinement",
-          "when": "Final quality pass before shipping frontend"
+          "when": "Final quality pass before shipping frontend",
+          "depends_on": "impeccable/audit"
         },
         "audit": {
           "file": "audit.md",
@@ -49,7 +66,8 @@
         "normalize": {
           "file": "normalize.md",
           "role": "design_consistency",
-          "when": "Aligning implementation with design system"
+          "when": "Aligning implementation with design system",
+          "depends_on": "impeccable/critique"
         },
         "optimize": {
           "file": "optimize.md",
@@ -82,6 +100,7 @@
     },
 
     "vercel-web-design": {
+      "version": "1.0.0",
       "description": "Web Interface Guidelines compliance review. Engineering-grade UX quality gate (accessibility, performance, standards).",
       "source": "https://github.com/vercel-labs/web-interface-guidelines",
       "license": "MIT",

@@ -90,6 +90,22 @@ For ALL code (frontend and backend), verify against `.ai/recipes/error-handling-
 4. **Frontend error reporting**: Error boundary at app root. Errors reported to `/api/log/error`. User sees generic message, not raw error.
 5. **No bare console.log**: Production code uses structured logger, not `console.log`.
 
+### Stage 4d: Security Audit (security-audit.md)
+
+For ALL projects, apply the checks in `.ai/recipes/security-audit.md`:
+
+1. **OWASP Top 10**: Walk through each category relevant to the code changed:
+   - Broken Access Control: verify ownership checks on every data-access endpoint
+   - Injection: confirm all user input goes through parameterized queries or validated schemas
+   - Sensitive Data Exposure: no PII in logs, passwords hashed with bcrypt/argon2, HTTPS enforced
+   - Broken Authentication: JWT expiry set, HttpOnly cookies, no session fixation
+   - Security Misconfiguration: CORS not wildcarded on auth routes, verbose errors off in production
+   - XSS: no `innerHTML`/`dangerouslySetInnerHTML` with unescaped user content
+2. **Dependency vulnerability scan**: Run `pnpm audit --audit-level=moderate` (or `npm audit`). Any `critical` or `high` advisory blocks the review.
+3. **Secrets detection**: Grep source files for API keys, tokens, and hardcoded passwords. Verify `.env` files are in `.gitignore`. Confirm `.env.example` contains only placeholders.
+
+Any `CRITICAL` or `HIGH` finding from the security audit blocks merge, the same as a Stage 1 failure.
+
 ### Stage 5: PRD Traceability
 
 1. **Requirement mapping**: Does this code change map to a specific PRD requirement?
@@ -98,7 +114,7 @@ For ALL code (frontend and backend), verify against `.ai/recipes/error-handling-
 
 ## Pass / Fail Criteria
 
-- **PASS**: All 5 stages pass, TDD verified, no anti-patterns, PRD traceable
+- **PASS**: All 5 stages pass, TDD verified, no anti-patterns, security audit clean, PRD traceable
 - **FAIL**: Any stage fails → specific feedback to the worker, do NOT merge
 
 ## Output

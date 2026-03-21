@@ -1,0 +1,33 @@
+{
+  "name": "API Service",
+  "description": "Backend API with no frontend — REST or GraphQL",
+  "recommended_skills": [],
+  "review_gates": {
+    "mrd_prd_review": true,
+    "tech_design_review": true,
+    "code_review": true,
+    "test_coverage_review": true,
+    "marketing_review": false
+  },
+  "optional_modules": {
+    "payment": { "enabled": false }
+  },
+  "discipline": {
+    "tdd_default": true,
+    "code_review_required": true
+  },
+  "suggested_phases": [
+    "Database Schema & Models",
+    "Core API Endpoints",
+    "Authentication & Authorization",
+    "Validation & Error Handling",
+    "Documentation & Testing"
+  ],
+  "starter_tasks": [
+    { "name": "Design database schema", "type": "planning", "priority": "P0" },
+    { "name": "Implement core CRUD endpoints", "type": "feature", "priority": "P0" },
+    { "name": "Add authentication middleware", "type": "feature", "priority": "P0" },
+    { "name": "Add input validation and error handling", "type": "feature", "priority": "P1" },
+    { "name": "Generate API documentation", "type": "docs", "priority": "P1" }
+  ]
+}

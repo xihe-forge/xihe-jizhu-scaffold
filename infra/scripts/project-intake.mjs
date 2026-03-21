@@ -844,6 +844,43 @@ async function main() {
       userProfile = ["one_click", "standard", "advanced"][profileIndex];
     }
 
+    // --- Project Type Template Selection ---
+    console.log("");
+    const TEMPLATE_FILES = [
+      ".ai/templates/saas.json",
+      ".ai/templates/landing-page.json",
+      ".ai/templates/api-only.json",
+      ".ai/templates/fullstack.json"
+    ];
+    let selectedTemplate = null;
+    let templateIndex;
+    if (scriptedInput?.projectTemplate !== undefined) {
+      templateIndex = Number(scriptedInput.projectTemplate);
+      logScriptedAnswer("Project type", templateIndex);
+    } else {
+      templateIndex = await promptChoice(rl, "What type of project are you building?", [
+        "SaaS Application — full-stack with auth, billing, dashboard",
+        "Landing Page / Marketing Site — static or semi-static with i18n",
+        "API Service — backend only, REST or GraphQL",
+        "Full-Stack Application — frontend + backend with shared types",
+        "Custom (no template) — start from scratch"
+      ], 4);
+    }
+
+    if (templateIndex >= 0 && templateIndex <= 3) {
+      selectedTemplate = readJson(TEMPLATE_FILES[templateIndex], null);
+      if (selectedTemplate) {
+        console.log(`Template applied: ${selectedTemplate.name}`);
+        if (Array.isArray(selectedTemplate.suggested_phases) && selectedTemplate.suggested_phases.length > 0) {
+          console.log("");
+          console.log("Suggested phases for this project type:");
+          for (const phase of selectedTemplate.suggested_phases) {
+            console.log(`  • ${phase}`);
+          }
+        }
+      }
+    }
+
     // --- Review Strategy (standard & advanced only) ---
     let reviewStrategy = { mode: "auto", custom_rounds: null, zero_bug_threshold: 3 };
     if (userProfile !== "one_click") {
@@ -960,16 +997,89 @@ async function main() {
 
     // --- Write review strategy, user profile, and modules to planning config ---
     const planConfig = readJson(".planning/config.json", {});
+
+    // Apply template defaults first (user overrides take precedence below)
+    if (selectedTemplate) {
+      // Apply review_gates defaults from template
+      if (selectedTemplate.review_gates && planConfig.review_gates) {
+        for (const [gate, enabled] of Object.entries(selectedTemplate.review_gates)) {
+          if (planConfig.review_gates[gate]) {
+            planConfig.review_gates[gate] = {
+              ...planConfig.review_gates[gate],
+              enabled: Boolean(enabled)
+            };
+          }
+        }
+      }
+      // Apply discipline defaults from template
+      if (selectedTemplate.discipline) {
+        planConfig.discipline = {
+          ...planConfig.discipline,
+          ...selectedTemplate.discipline
+        };
+      }
+      // Apply optional_modules defaults from template (payment.enabled only)
+      if (selectedTemplate.optional_modules?.payment !== undefined) {
+        if (!planConfig.optional_modules) planConfig.optional_modules = {};
+        if (!planConfig.optional_modules.payment) planConfig.optional_modules.payment = {};
+        planConfig.optional_modules.payment.enabled =
+          Boolean(selectedTemplate.optional_modules.payment.enabled);
+      }
+      // Store selected template name for reference
+      planConfig.project_template = selectedTemplate.name;
+    }
+
     planConfig.user_profile = userProfile;
     planConfig.review_strategy = reviewStrategy;
     if (!planConfig.optional_modules) planConfig.optional_modules = {};
     planConfig.optional_modules.payment = {
+      ...(planConfig.optional_modules.payment ?? {}),
       enabled: paymentEnabled,
       provider: "creem",
       recipe: ".ai/recipes/payment-integration-guide.md",
       payout_method: "wise"
     };
     writeJson(".planning/config.json", planConfig);
+
+    // --- Merge template starter tasks into dev/task.json ---
+    if (selectedTemplate?.starter_tasks?.length > 0) {
+      const taskJson = readJson("dev/task.json", null);
+      if (taskJson && Array.isArray(taskJson.tasks)) {
+        const existingIds = new Set(taskJson.tasks.map((t) => t.id));
+        // Find highest existing numeric task ID to avoid collisions
+        let maxId = taskJson.tasks.reduce((max, t) => {
+          const match = /^T(\d+)$/u.exec(t.id ?? "");
+          return match ? Math.max(max, Number(match[1])) : max;
+        }, 0);
+
+        const newTasks = [];
+        for (const starterTask of selectedTemplate.starter_tasks) {
+          maxId += 1;
+          const taskId = `T${String(maxId).padStart(3, "0")}`;
+          if (!existingIds.has(taskId)) {
+            newTasks.push({
+              id: taskId,
+              phase: selectedTemplate.suggested_phases?.[0] ?? "Phase 1",
+              type: starterTask.type ?? "feature",
+              name: starterTask.name,
+              description: `Starter task from ${selectedTemplate.name} template.`,
+              priority: starterTask.priority ?? "P1",
+              status: "todo",
+              assignee: "agent",
+              depends_on: [],
+              acceptance_criteria: []
+            });
+          }
+        }
+
+        if (newTasks.length > 0) {
+          taskJson.tasks = [...taskJson.tasks, ...newTasks];
+          taskJson.updated_at = new Date().toISOString();
+          writeJson("dev/task.json", taskJson);
+          console.log(`${newTasks.length} starter task(s) from the ${selectedTemplate.name} template added to dev/task.json.`);
+        }
+      }
+    }
 
     let shouldVerify = state.nextAction.shouldVerify;
     let shouldStartWork = state.nextAction.shouldStartWork;

@@ -1,0 +1,33 @@
+{
+  "name": "Landing Page / Marketing Site",
+  "description": "Static or semi-static marketing website with i18n support",
+  "recommended_skills": ["impeccable", "vercel-web-design"],
+  "review_gates": {
+    "mrd_prd_review": false,
+    "tech_design_review": false,
+    "code_review": true,
+    "test_coverage_review": false,
+    "marketing_review": true
+  },
+  "optional_modules": {
+    "payment": { "enabled": false }
+  },
+  "discipline": {
+    "tdd_default": false,
+    "code_review_required": true
+  },
+  "suggested_phases": [
+    "Hero & Navigation",
+    "Feature Sections",
+    "Social Proof & Testimonials",
+    "CTA & Footer",
+    "i18n & Responsive Polish"
+  ],
+  "starter_tasks": [
+    { "name": "Create hero section with CTA", "type": "feature", "priority": "P0" },
+    { "name": "Build feature showcase sections", "type": "feature", "priority": "P0" },
+    { "name": "Add navigation and footer", "type": "feature", "priority": "P0" },
+    { "name": "Implement responsive design", "type": "feature", "priority": "P1" },
+    { "name": "Add i18n support", "type": "feature", "priority": "P2" }
+  ]
+}

@@ -256,7 +256,42 @@ These are **not** part of the core autopilot — they extend it.
 - During **final review**: both modules are used as parallel quality gates
 - **CLI commands**: `/design`, `/ux-audit`, `/review` invoke these skills directly
 
+**Skill dependency chains**: Skills declare `depends_on` in the registry — autopilot topologically sorts and injects them in correct order (e.g., audit before polish).
+
+**Skill execution tracking**: Each task logs `[SKILLS] Task {id}: injected N skills (...)` to `dev/progress.txt`.
+
 Skill registry: `.ai/skills/skill-registry.json`
+
+### Security Audit
+
+All projects undergo automated security review via `.ai/recipes/security-audit.md`:
+- OWASP Top 10 checks (injection, XSS, access control, etc.)
+- Dependency vulnerability scanning (`pnpm audit`)
+- Secrets detection (grep for hardcoded keys/tokens/passwords)
+- API security (rate limiting, CORS, input validation)
+- Frontend security (CSP, cookie flags, innerHTML ban)
+
+Security findings with CRITICAL or HIGH severity **block** the code review gate.
+
+### Cost & Metrics Tracking
+
+The autopilot tracks per-task cost, tokens, and duration in `dev/metrics.json`:
+- Input/output tokens and USD cost captured from runner stream events
+- Per-session aggregation with totals
+- Accessible via `/cost` CLI command (summary or detail view)
+
+### Deploy Readiness
+
+Run `node infra/scripts/health-check.mjs --deploy-ready` to check production readiness:
+- Environment variable completeness (no placeholders)
+- Hardcoded secrets scan
+- Build verification
+- Legal pages (if payment enabled)
+
+### Project Templates
+
+Intake flow offers project type templates: SaaS, Landing Page, API-only, Full-stack.
+Templates pre-configure review gates, discipline settings, optional modules, and starter tasks.
 
 ### Delivery Rules
 
