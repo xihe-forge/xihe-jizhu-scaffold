@@ -1,0 +1,118 @@
+{
+  "version": "1.0.0",
+  "description": "External skill modules registry. Autopilot uses this to determine which skills to invoke at each phase.",
+
+  "skills": {
+    "impeccable": {
+      "description": "Frontend design generation and iterative refinement. Anti-AI-slop aesthetics.",
+      "source": "https://github.com/garkgodwin/impeccable",
+      "license": "Apache 2.0",
+      "path": ".ai/skills/impeccable",
+      "trigger": {
+        "phase": ["implement", "review"],
+        "task_tags": ["frontend", "ui", "design", "component", "page", "layout"],
+        "file_patterns": ["*.tsx", "*.jsx", "*.vue", "*.svelte", "*.css", "*.scss"]
+      },
+      "skills": {
+        "frontend-design": {
+          "file": "frontend-design.md",
+          "role": "design_generator",
+          "when": "Creating new UI components, pages, or layouts",
+          "requires_context": true,
+          "context_file": ".impeccable.md"
+        },
+        "teach-impeccable": {
+          "file": "teach-impeccable.md",
+          "role": "setup",
+          "when": "First-time setup or when .impeccable.md is missing"
+        },
+        "polish": {
+          "file": "polish.md",
+          "role": "design_refinement",
+          "when": "Final quality pass before shipping frontend"
+        },
+        "audit": {
+          "file": "audit.md",
+          "role": "design_audit",
+          "when": "Comprehensive UI quality audit (accessibility, performance, theming, responsive)"
+        },
+        "critique": {
+          "file": "critique.md",
+          "role": "design_review",
+          "when": "Evaluating design effectiveness and UX quality"
+        },
+        "harden": {
+          "file": "harden.md",
+          "role": "design_hardening",
+          "when": "Improving error handling, i18n, edge cases in UI"
+        },
+        "normalize": {
+          "file": "normalize.md",
+          "role": "design_consistency",
+          "when": "Aligning implementation with design system"
+        },
+        "optimize": {
+          "file": "optimize.md",
+          "role": "performance",
+          "when": "Improving frontend performance (loading, rendering, bundle size)"
+        },
+        "distill": {
+          "file": "distill.md",
+          "role": "design_simplification",
+          "when": "Removing unnecessary UI complexity"
+        },
+        "extract": {
+          "file": "extract.md",
+          "role": "component_extraction",
+          "when": "Extracting reusable components and design tokens"
+        }
+      },
+      "reference": {
+        "path": "reference/",
+        "files": [
+          "typography.md",
+          "color-and-contrast.md",
+          "spatial-design.md",
+          "motion-design.md",
+          "interaction-design.md",
+          "responsive-design.md",
+          "ux-writing.md"
+        ]
+      }
+    },
+
+    "vercel-web-design": {
+      "description": "Web Interface Guidelines compliance review. Engineering-grade UX quality gate (accessibility, performance, standards).",
+      "source": "https://github.com/vercel-labs/web-interface-guidelines",
+      "license": "MIT",
+      "path": ".ai/skills/vercel-web-design",
+      "trigger": {
+        "phase": ["review", "final_review"],
+        "task_tags": ["frontend", "ui", "design", "accessibility", "ux"],
+        "file_patterns": ["*.tsx", "*.jsx", "*.vue", "*.svelte", "*.html"]
+      },
+      "skills": {
+        "web-design-guidelines": {
+          "file": "web-design-guidelines.md",
+          "role": "engineering_qa",
+          "when": "Reviewing frontend code for Web Interface Guidelines compliance"
+        }
+      }
+    }
+  },
+
+  "phase_mapping": {
+    "implement_frontend": {
+      "design": ["impeccable/frontend-design"],
+      "reference": ["impeccable/reference/*"]
+    },
+    "review_frontend": {
+      "aesthetic_review": ["impeccable/critique", "impeccable/audit"],
+      "engineering_review": ["vercel-web-design/web-design-guidelines"],
+      "refinement": ["impeccable/polish", "impeccable/normalize"]
+    },
+    "final_review": {
+      "qa_gate": ["impeccable/audit", "vercel-web-design/web-design-guidelines"]
+    }
+  }
+}

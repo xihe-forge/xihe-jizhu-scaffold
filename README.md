@@ -50,6 +50,8 @@ Got an existing project? `pnpm adopt` overlays the planning layer without touchi
 robust-ai-scaffold/
 ├── .planning/          # Durable planning state (PROJECT, REQUIREMENTS, ROADMAP, STATE)
 ├── .ai/recipes/        # Agent playbooks (implement, review, diagnose, adopt)
+├── .ai/skills/         # External skill modules (impeccable, vercel-web-design)
+├── .claude/commands/   # CLI skill commands (/intake, /autopilot, /review, etc.)
 ├── .autopilot/         # Runtime config (model selection, retry policy)
 ├── apps/               # Application entrypoints
 ├── packages/           # Shared code and types
@@ -129,27 +131,54 @@ pnpm autopilot:configure # Change AI runtime
 pnpm autopilot:stop      # Stop the autopilot
 ```
 
+### CLI Skill Commands
+
+These commands are available when using Claude Code in the project:
+
+| Command | Purpose |
+|---------|---------|
+| `/intake` | Run project intake wizard |
+| `/autopilot` | Start autopilot loop |
+| `/health` | Run health checks |
+| `/status` | Show project status at a glance |
+| `/review [files]` | Code + frontend review |
+| `/design [target]` | Frontend design generation/refinement (impeccable) |
+| `/ux-audit [files]` | Dual UX audit (aesthetic + engineering) |
+
+## External Skill Modules
+
+The scaffold's core architecture (autopilot, intake, review pipeline) is self-contained. External skill modules extend it for specialized domains:
+
+| Module | Role | Source |
+|--------|------|--------|
+| **impeccable** | Frontend design generation & refinement, anti-AI-slop aesthetics | [impeccable](https://github.com/garkgodwin/impeccable) |
+| **vercel-web-design** | Engineering UX quality gate (accessibility, performance, standards) | [vercel-labs](https://github.com/vercel-labs/web-interface-guidelines) |
+
+These two modules are **complementary**: impeccable handles visual aesthetics (anti-AI-slop), Vercel handles engineering standards (a11y, performance, UX). Both are used together for maximum frontend quality.
+
+Skill registry: `.ai/skills/skill-registry.json`
+
 ## Stage-Based Review Gates
 
-The scaffold enforces mandatory reviews at each development stage, powered by specialized opensource tools:
+The scaffold enforces mandatory reviews at each development stage:
 
 ```
-MRD/PRD Created ──► review-mrd-prd.md ──────► pm-skills, superpowers
+MRD/PRD Created ──► review-mrd-prd.md
                          │ BLOCKING
                          ▼
-Tech/Design Docs ──► review-tech-design.md ──► impeccable, ui-ux-pro-max-skill, open-lovable
+Tech/Design Docs ──► review-tech-design.md ──► impeccable/frontend-design (cross-check)
                          │ BLOCKING
                          ▼
-Code Implementation► review-code.md ─────────► superpowers, impeccable
+Code Implementation► review-code.md ─────────► impeccable/audit + vercel/web-design-guidelines
                          │ BLOCKING
                          ▼
-Testing Complete ──► review-test-coverage.md ► superpowers, pm-skills (100% PRD coverage)
+Testing Complete ──► review-test-coverage.md ► PRD-to-test matrix (100% coverage)
                          │ BLOCKING
                          ▼
-Marketing ─────────► review-marketing.md ────► marketingskills, pm-skills
+Marketing ─────────► review-marketing.md
                          │ Advisory
                          ▼
-                      ✅ Phase Complete
+                      Phase Complete
 ```
 
 **Key rule**: Tests must cover the **entire PRD** — every requirement needs at least one test. The test coverage review builds a PRD-to-test matrix and blocks on any gaps.

@@ -240,6 +240,24 @@ The higher tier wins when task count and file count fall in different tiers.
 
 This ensures no issues are swept under the rug — the human always has final say.
 
+### External Skill Modules
+
+The scaffold integrates independent, pluggable skill modules for specialized tasks.
+These are **not** part of the core autopilot — they extend it.
+
+| Module | Role | Location |
+|--------|------|----------|
+| **impeccable** | Frontend design generation & refinement (anti-AI-slop) | `.ai/skills/impeccable/` |
+| **vercel-web-design** | Engineering UX quality gate (a11y, performance, standards) | `.ai/skills/vercel-web-design/` |
+
+**How they're used:**
+- During **implementation**: autopilot injects impeccable's `frontend-design.md` instructions for frontend tasks
+- During **review**: code reviewers apply impeccable `audit.md` (aesthetic) + vercel `web-design-guidelines.md` (engineering)
+- During **final review**: both modules are used as parallel quality gates
+- **CLI commands**: `/design`, `/ux-audit`, `/review` invoke these skills directly
+
+Skill registry: `.ai/skills/skill-registry.json`
+
 ### Delivery Rules
 
 - Complete the task in the smallest useful slice

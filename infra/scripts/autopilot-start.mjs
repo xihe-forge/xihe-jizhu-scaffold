@@ -482,6 +482,93 @@ function buildCodexDelegationBlock(task) {
  * @param {object} config - Autopilot configuration
  * @returns {string} The complete prompt text
  */
+
+/**
+ * Load external skill instructions based on task type and current phase.
+ * Reads .ai/skills/skill-registry.json and returns relevant skill instructions
+ * to inject into the prompt.
+ * @param {Array} tasks - Current tasks being executed
+ * @param {string} phase - Current phase: "implement" | "review" | "final_review"
+ * @returns {string} Skill instructions block, or empty string if no skills match
+ */
+function loadSkillInstructions(tasks, phase = "implement") {
+  const registry = readJson(".ai/skills/skill-registry.json", null);
+  if (!registry?.skills) return "";
+
+  const taskTags = new Set();
+  const filePatterns = new Set();
+  for (const t of tasks) {
+    const type = (t.type || "").toLowerCase();
+    const name = (t.name || "").toLowerCase();
+    const desc = (t.description || "").toLowerCase();
+    const combined = `${type} ${name} ${desc}`;
+    for (const tag of ["frontend", "ui", "design", "component", "page", "layout", "accessibility", "ux"]) {
+      if (combined.includes(tag)) taskTags.add(tag);
+    }
+  }
+
+  if (taskTags.size === 0) return "";
+
+  const parts = [];
+  for (const [moduleId, mod] of Object.entries(registry.skills)) {
+    const trigger = mod.trigger || {};
+    const phaseMatch = (trigger.phase || []).includes(phase);
+    const tagMatch = (trigger.task_tags || []).some((tag) => taskTags.has(tag));
+    if (!phaseMatch && !tagMatch) continue;
+
+    const skillEntries = Object.entries(mod.skills || {});
+    if (skillEntries.length === 0) continue;
+
+    const skillList = skillEntries
+      .map(([name, skill]) => `  - **${name}**: ${skill.when || ""}  \n    File: \`.ai/skills/${mod.path?.replace(".ai/skills/", "") || moduleId}/${skill.file}\``)
+      .join("\n");
+
+    parts.push(
+      `### Skill Module: ${moduleId}`,
+      mod.description || "",
+      `Source: ${mod.source || "bundled"}`,
+      "",
+      "Available skills:",
+      skillList
+    );
+
+    if (mod.reference?.files?.length) {
+      parts.push(
+        "",
+        "Reference docs (read as needed):",
+        ...mod.reference.files.map((f) => `  - .ai/skills/${mod.path?.replace(".ai/skills/", "") || moduleId}/${mod.reference.path}${f}`)
+      );
+    }
+    parts.push("");
+  }
+
+  if (parts.length === 0) return "";
+
+  // Add phase-specific instructions from phase_mapping
+  const phaseMap = registry.phase_mapping || {};
+  const phaseKey = phase === "implement" ? "implement_frontend"
+    : phase === "review" ? "review_frontend"
+    : phase === "final_review" ? "final_review"
+    : null;
+
+  if (phaseKey && phaseMap[phaseKey]) {
+    const mapping = phaseMap[phaseKey];
+    parts.push("### Phase-Specific Skill Usage");
+    for (const [role, skills] of Object.entries(mapping)) {
+      parts.push(`- **${role}**: Read and follow ${skills.join(", ")}`);
+    }
+    parts.push("");
+  }
+
+  return [
+    "## Frontend Design Skills (External Modules)",
+    "This project includes external skill modules for frontend design quality.",
+    "Read the relevant skill files when working on frontend tasks.",
+    "",
+    ...parts
+  ].join("\n");
+}
+
 function buildPrompt(readyTasks, config) {
   const progress = getProgressTail();
   const summary = getTaskProgressSummary();
@@ -520,6 +607,12 @@ function buildPrompt(readyTasks, config) {
       "- MUST include a working support email in the footer — providers verify this",
       ""
     );
+  }
+
+  // Inject external skill modules for frontend tasks
+  const skillBlock = loadSkillInstructions(readyTasks, "implement");
+  if (skillBlock) {
+    sharedHeaderParts.push(skillBlock, "");
   }
 
   const sharedHeader = sharedHeaderParts.join("\n");
@@ -821,7 +914,7 @@ function buildFinalReviewPrompt(config, round, previousFindings) {
         "### Codex — Document Review",
         "Delegate to Codex CLI via codex-bridge (see AGENTS.md Codex Delegation Protocol).",
         "Codex reviews: MRD completeness, PRD quality, tech spec accuracy, design doc alignment.",
-        "Apply the methodology from: pm-skills, superpowers.",
+        "For frontend design docs: cross-check against .ai/skills/impeccable/frontend-design.md standards.",
         "Output findings as a structured list in the handoff result.",
         ""
       );
@@ -832,7 +925,7 @@ function buildFinalReviewPrompt(config, round, previousFindings) {
         `Launch a sub-Agent with \`model: '${model}'\` (no worktree needed for read-only review).`,
         "Review: MRD completeness, PRD quality, tech spec accuracy, design doc alignment.",
         "Apply review-mrd-prd.md and review-tech-design.md recipes.",
-        "Use methodology from: pm-skills, superpowers, impeccable, ui-ux-pro-max-skill.",
+        "For frontend design docs: cross-check against .ai/skills/impeccable/frontend-design.md standards.",
         "Return a structured findings list.",
         ""
       );
@@ -846,7 +939,7 @@ function buildFinalReviewPrompt(config, round, previousFindings) {
         "### Codex — Code & Test Review",
         "Delegate to Codex CLI via codex-bridge.",
         "Codex reviews: code quality, test coverage (build PRD-to-test matrix), TDD compliance, security.",
-        "Apply the methodology from: superpowers, impeccable.",
+        "For frontend: apply .ai/skills/impeccable/audit.md + .ai/skills/vercel-web-design/web-design-guidelines.md.",
         "Output findings as a structured list.",
         ""
       );
@@ -856,7 +949,9 @@ function buildFinalReviewPrompt(config, round, previousFindings) {
         `### ${reviewer.charAt(0).toUpperCase() + reviewer.slice(1)} — Code & Test Review`,
         `Launch a sub-Agent with \`model: '${model}', isolation: 'worktree'\`.`,
         "Review: code quality (review-code.md), test coverage (review-test-coverage.md),",
-        "TDD compliance, frontend quality (impeccable /audit if applicable), security.",
+        "TDD compliance, security.",
+        "For frontend code: read and apply .ai/skills/impeccable/audit.md (aesthetic + anti-AI-slop audit),",
+        "then .ai/skills/vercel-web-design/web-design-guidelines.md (engineering QA: a11y, performance, UX).",
         "Build a PRD-to-test coverage matrix — every PRD requirement MUST have a test.",
         "Return a structured findings list.",
         ""
@@ -1830,4 +1925,4 @@ if (isDirectRun) {
 }
 
 // Export for testing
-export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds };
+export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds, loadSkillInstructions };
