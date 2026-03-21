@@ -14,7 +14,11 @@ import {
   buildPrompt,
   buildReviewGateInstructions,
   buildFinalReviewPrompt,
-  computeMaxReviewRounds
+  computeMaxReviewRounds,
+  loadSkillInstructions,
+  getSkillExecutionOrder,
+  topoSortSkills,
+  recordTaskMetrics
 } from "../../infra/scripts/autopilot-start.mjs";
 
 // The scaffold root — same directory that utils.mjs captures as rootDir
@@ -968,5 +972,328 @@ describe("computeMaxReviewRounds", () => {
     assert.strictEqual(computeMaxReviewRounds({ taskCount: 5, sourceFileCount: 5, reviewStrategy: { mode: "auto" } }), 5);
     assert.strictEqual(computeMaxReviewRounds({ taskCount: 5, sourceFileCount: 5, reviewStrategy: { mode: "unknown" } }), 5);
     assert.strictEqual(computeMaxReviewRounds({ taskCount: 100, sourceFileCount: 200, reviewStrategy: { mode: "auto" } }), 12);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Minimal in-memory registry used by topoSortSkills tests
+// ---------------------------------------------------------------------------
+
+const TOPO_REGISTRY = {
+  skills: {
+    impeccable: {
+      skills: {
+        "frontend-design": { file: "frontend-design.md" },
+        "audit": { file: "audit.md" },
+        "critique": { file: "critique.md" },
+        "polish": { file: "polish.md", depends_on: "impeccable/audit" },
+        "normalize": { file: "normalize.md", depends_on: "impeccable/critique" },
+        "harden": { file: "harden.md" }
+      }
+    },
+    "vercel-web-design": {
+      skills: {
+        "web-design-guidelines": { file: "web-design-guidelines.md" }
+      }
+    }
+  }
+};
+
+// ---------------------------------------------------------------------------
+// topoSortSkills
+// ---------------------------------------------------------------------------
+
+describe("topoSortSkills", () => {
+  it("sorts audit before polish (audit is depended on by polish)", () => {
+    const ids = ["impeccable/polish", "impeccable/audit"];
+    const sorted = topoSortSkills(ids, TOPO_REGISTRY);
+    assert.ok(sorted.indexOf("impeccable/audit") < sorted.indexOf("impeccable/polish"),
+      `Expected audit before polish, got: ${sorted.join(", ")}`);
+  });
+
+  it("sorts critique before normalize (normalize depends_on critique)", () => {
+    const ids = ["impeccable/normalize", "impeccable/critique"];
+    const sorted = topoSortSkills(ids, TOPO_REGISTRY);
+    assert.ok(sorted.indexOf("impeccable/critique") < sorted.indexOf("impeccable/normalize"),
+      `Expected critique before normalize, got: ${sorted.join(", ")}`);
+  });
+
+  it("preserves order for skills with no dependencies", () => {
+    const ids = ["impeccable/frontend-design", "impeccable/harden"];
+    const sorted = topoSortSkills(ids, TOPO_REGISTRY);
+    assert.deepEqual(sorted, ["impeccable/frontend-design", "impeccable/harden"]);
+  });
+
+  it("returns empty array for empty input", () => {
+    const sorted = topoSortSkills([], TOPO_REGISTRY);
+    assert.deepEqual(sorted, []);
+  });
+
+  it("handles dependency not present in input list without crashing", () => {
+    // polish depends on audit, but audit is not in the input list
+    const ids = ["impeccable/polish"];
+    assert.doesNotThrow(() => topoSortSkills(ids, TOPO_REGISTRY));
+    const sorted = topoSortSkills(ids, TOPO_REGISTRY);
+    assert.deepEqual(sorted, ["impeccable/polish"]);
+  });
+
+  it("handles full review chain with multiple dependency paths", () => {
+    // critique -> normalize, audit -> polish
+    const ids = [
+      "impeccable/polish",
+      "impeccable/normalize",
+      "impeccable/critique",
+      "impeccable/audit"
+    ];
+    const sorted = topoSortSkills(ids, TOPO_REGISTRY);
+    assert.ok(sorted.indexOf("impeccable/audit") < sorted.indexOf("impeccable/polish"),
+      "audit must precede polish");
+    assert.ok(sorted.indexOf("impeccable/critique") < sorted.indexOf("impeccable/normalize"),
+      "critique must precede normalize");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getSkillExecutionOrder — reads .ai/skills/skill-registry.json from disk
+// ---------------------------------------------------------------------------
+
+describe("getSkillExecutionOrder", () => {
+  it("returns correct skills for implement_frontend", () => {
+    const order = getSkillExecutionOrder("implement_frontend");
+    assert.ok(Array.isArray(order), "should return an array");
+    assert.ok(order.includes("impeccable/frontend-design"),
+      `Expected impeccable/frontend-design in: ${order.join(", ")}`);
+  });
+
+  it("returns correct skills for review_frontend with correct order", () => {
+    const order = getSkillExecutionOrder("review_frontend");
+    assert.ok(Array.isArray(order), "should return an array");
+    // critique comes before audit, audit before polish in the registry
+    assert.ok(order.includes("impeccable/critique"), "should include critique");
+    assert.ok(order.includes("impeccable/audit"), "should include audit");
+    assert.ok(order.includes("impeccable/polish"), "should include polish");
+    assert.ok(order.indexOf("impeccable/critique") < order.indexOf("impeccable/audit"),
+      "critique should precede audit in review_frontend order");
+  });
+
+  it("returns correct skills for final_review", () => {
+    const order = getSkillExecutionOrder("final_review");
+    assert.ok(Array.isArray(order), "should return an array");
+    assert.ok(order.includes("impeccable/audit"), "should include audit");
+    assert.ok(order.includes("vercel-web-design/web-design-guidelines"),
+      "should include vercel-web-design/web-design-guidelines");
+  });
+
+  it("returns empty array for unknown phase", () => {
+    const order = getSkillExecutionOrder("unknown_phase_xyz");
+    assert.deepEqual(order, []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// loadSkillInstructions — reads skill registry from disk
+// ---------------------------------------------------------------------------
+
+describe("loadSkillInstructions", () => {
+  it("returns empty string for non-frontend tasks (backend, database)", () => {
+    const tasks = [
+      { type: "backend", name: "Create REST API", description: "Add database endpoints" },
+      { type: "database", name: "Migrations", description: "Run SQL migrations" }
+    ];
+    const result = loadSkillInstructions(tasks, "implement");
+    assert.equal(result, "", "Expected empty string for non-frontend tasks");
+  });
+
+  it("returns skill instructions for tasks with 'frontend' in the name", () => {
+    const tasks = [
+      { type: "feature", name: "Build frontend dashboard", description: "Create a new page" }
+    ];
+    const result = loadSkillInstructions(tasks, "implement");
+    assert.ok(result.length > 0, "Expected non-empty skill instructions for frontend task");
+    assert.ok(result.includes("Frontend Design Skills"), "Expected skills header");
+  });
+
+  it("returns skill instructions for tasks with 'ui' in description", () => {
+    const tasks = [
+      { type: "feature", name: "Update settings", description: "Improve the ui layout" }
+    ];
+    const result = loadSkillInstructions(tasks, "implement");
+    assert.ok(result.length > 0, "Expected non-empty skill instructions for ui task");
+  });
+
+  it("includes execution order note in output for frontend implement phase", () => {
+    const tasks = [
+      { type: "frontend", name: "Landing page", description: "Design new landing page" }
+    ];
+    const result = loadSkillInstructions(tasks, "implement");
+    assert.ok(result.includes("execution order"), `Expected execution order note in output, got: ${result.slice(0, 200)}`);
+  });
+
+  it("includes dependency note (after impeccable/audit) for polish skill", () => {
+    const tasks = [
+      { type: "frontend", name: "Polish UI", description: "Final design polish" }
+    ];
+    const result = loadSkillInstructions(tasks, "review");
+    // polish depends_on audit — should be noted in output
+    assert.ok(result.includes("after impeccable/audit"),
+      `Expected 'after impeccable/audit' dep note in output`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recordTaskMetrics
+// ---------------------------------------------------------------------------
+
+describe("recordTaskMetrics", () => {
+  let originalMetrics;
+
+  beforeEach(() => {
+    originalMetrics = saveFixture("dev/metrics.json");
+  });
+
+  afterEach(() => {
+    const full = scaffoldPath("dev/metrics.json");
+    if (originalMetrics === null) {
+      // File didn't exist before — remove or reset to avoid polluting disk
+      try { writeFileSync(full, JSON.stringify({ sessions: [] }), "utf8"); } catch { /* ignore */ }
+    } else {
+      writeFileSync(full, originalMetrics, "utf8");
+    }
+  });
+
+  it("creates dev/metrics.json with correct structure on first call", () => {
+    const sessionId = `test-session-create-${Date.now()}`;
+    // Remove any existing metrics file so we start fresh
+    writeFixture("dev/metrics.json", JSON.stringify({ sessions: [] }));
+
+    recordTaskMetrics({
+      sessionId,
+      sessionStartedAt: "2026-01-01T00:00:00.000Z",
+      taskId: "T001",
+      model: "claude-sonnet",
+      startedAt: "2026-01-01T00:00:01.000Z",
+      completedAt: "2026-01-01T00:00:05.000Z",
+      durationMs: 4000,
+      inputTokens: 100,
+      outputTokens: 200,
+      costUsd: 0.001,
+      status: "success"
+    });
+
+    const data = JSON.parse(readFileSync(scaffoldPath("dev/metrics.json"), "utf8"));
+    assert.ok(Array.isArray(data.sessions), "sessions should be an array");
+    const session = data.sessions.find((s) => s.session_id === sessionId);
+    assert.ok(session, "session entry should be created");
+    assert.equal(session.tasks.length, 1, "should have one task");
+    assert.equal(session.tasks[0].task_id, "T001");
+    assert.equal(session.totals.tasks_completed, 1);
+    assert.equal(session.totals.total_input_tokens, 100);
+    assert.equal(session.totals.total_output_tokens, 200);
+  });
+
+  it("appends to existing session on second call with same sessionId", () => {
+    const sessionId = `test-session-append-${Date.now()}`;
+    writeFixture("dev/metrics.json", JSON.stringify({ sessions: [] }));
+
+    const base = {
+      sessionId,
+      sessionStartedAt: "2026-01-01T00:00:00.000Z",
+      model: "claude-sonnet",
+      startedAt: "2026-01-01T00:00:01.000Z",
+      completedAt: "2026-01-01T00:00:05.000Z",
+      durationMs: 3000,
+      inputTokens: 50,
+      outputTokens: 80,
+      costUsd: 0.0005,
+      status: "success"
+    };
+
+    recordTaskMetrics({ ...base, taskId: "T001" });
+    recordTaskMetrics({ ...base, taskId: "T002" });
+
+    const data = JSON.parse(readFileSync(scaffoldPath("dev/metrics.json"), "utf8"));
+    const session = data.sessions.find((s) => s.session_id === sessionId);
+    assert.ok(session, "session should exist");
+    assert.equal(session.tasks.length, 2, "should have two tasks");
+    assert.equal(session.totals.tasks_completed, 2);
+    assert.equal(session.totals.total_input_tokens, 100);
+  });
+
+  it("only counts 'success' tasks toward tasks_completed but all count toward token totals", () => {
+    const sessionId = `test-session-counts-${Date.now()}`;
+    writeFixture("dev/metrics.json", JSON.stringify({ sessions: [] }));
+
+    const base = {
+      sessionId,
+      sessionStartedAt: "2026-01-01T00:00:00.000Z",
+      model: "claude-sonnet",
+      startedAt: "2026-01-01T00:00:01.000Z",
+      completedAt: "2026-01-01T00:00:05.000Z",
+      durationMs: 2000,
+      inputTokens: 100,
+      outputTokens: 100,
+      costUsd: 0.001,
+    };
+
+    recordTaskMetrics({ ...base, taskId: "T001", status: "success" });
+    recordTaskMetrics({ ...base, taskId: "T002", status: "failure" });
+    recordTaskMetrics({ ...base, taskId: "T003", status: "skipped" });
+
+    const data = JSON.parse(readFileSync(scaffoldPath("dev/metrics.json"), "utf8"));
+    const session = data.sessions.find((s) => s.session_id === sessionId);
+    assert.ok(session, "session should exist");
+    assert.equal(session.totals.tasks_completed, 1, "only success status counts");
+    assert.equal(session.totals.total_input_tokens, 300, "all tasks count for tokens");
+    assert.equal(session.totals.total_output_tokens, 300, "all tasks count for tokens");
+  });
+
+  it("creates separate session entries for different sessionIds", () => {
+    const sessionA = `test-session-A-${Date.now()}`;
+    const sessionB = `test-session-B-${Date.now()}`;
+    writeFixture("dev/metrics.json", JSON.stringify({ sessions: [] }));
+
+    const base = {
+      sessionStartedAt: "2026-01-01T00:00:00.000Z",
+      taskId: "T001",
+      model: "claude-sonnet",
+      startedAt: "2026-01-01T00:00:01.000Z",
+      completedAt: "2026-01-01T00:00:05.000Z",
+      durationMs: 1000,
+      inputTokens: 10,
+      outputTokens: 20,
+      costUsd: 0.0001,
+      status: "success"
+    };
+
+    recordTaskMetrics({ ...base, sessionId: sessionA });
+    recordTaskMetrics({ ...base, sessionId: sessionB });
+
+    const data = JSON.parse(readFileSync(scaffoldPath("dev/metrics.json"), "utf8"));
+    const sA = data.sessions.find((s) => s.session_id === sessionA);
+    const sB = data.sessions.find((s) => s.session_id === sessionB);
+    assert.ok(sA, "session A should exist");
+    assert.ok(sB, "session B should exist");
+    assert.equal(sA.tasks.length, 1);
+    assert.equal(sB.tasks.length, 1);
+  });
+
+  it("does not crash on corrupted/invalid metrics file", () => {
+    writeFixture("dev/metrics.json", "THIS IS NOT JSON {{{{");
+
+    assert.doesNotThrow(() => {
+      recordTaskMetrics({
+        sessionId: `test-session-corrupt-${Date.now()}`,
+        sessionStartedAt: "2026-01-01T00:00:00.000Z",
+        taskId: "T001",
+        model: "claude-sonnet",
+        startedAt: "2026-01-01T00:00:01.000Z",
+        completedAt: "2026-01-01T00:00:05.000Z",
+        durationMs: 500,
+        inputTokens: 5,
+        outputTokens: 10,
+        costUsd: 0.0001,
+        status: "success"
+      });
+    }, "recordTaskMetrics should not throw on corrupted metrics file");
   });
 });
