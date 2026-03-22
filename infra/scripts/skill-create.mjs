@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import {
@@ -49,11 +49,20 @@ function getExistingSkillIds(registry) {
 
 // --- Skill File Generation ---
 
+function yamlEscape(value) {
+  if (!value) return '""';
+  // Quote if value contains YAML special characters
+  if (/[:#\[\]{}&*!|>'"%@`,?-]/.test(value) || value.trim() !== value) {
+    return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  }
+  return value;
+}
+
 function generateSkillFile(metadata) {
   const lines = [
     "---",
-    `name: ${metadata.name}`,
-    `description: ${metadata.description}`
+    `name: ${yamlEscape(metadata.name)}`,
+    `description: ${yamlEscape(metadata.description)}`
   ];
 
   if (metadata.role) {
@@ -106,6 +115,10 @@ async function main() {
       process.exit(1);
     }
     const skillName = slugify(rawName);
+    if (!skillName) {
+      console.error(`Error: Skill name "${rawName}" produced an empty slug after sanitization. Use alphanumeric characters.`);
+      process.exit(1);
+    }
 
     console.log(`\nCreating skill: ${skillName}\n`);
 
@@ -143,11 +156,6 @@ async function main() {
         console.error(`Error: Module name "${rawModuleName}" produced an empty slug. Use alphanumeric characters.`);
         process.exit(1);
       }
-    }
-
-    if (!moduleName) {
-      console.error("Error: Module name is required.");
-      process.exit(1);
     }
 
     const modulePath = `${SKILLS_DIR}/${moduleName}`;

@@ -202,9 +202,18 @@ function writeAdoptionFiles(plan, { projectDescription, workGoal, currentStatus,
     console.log(`[adopt] Skipping files that already exist: ${existingFiles.join(", ")}`);
   }
 
-  if (missingFiles.length > 0) {
+  // Only call writeProjectPlan if none of the core planning files exist yet.
+  // writeProjectPlan writes all files unconditionally, so we skip entirely if
+  // any of the core files already exist to avoid overwriting them.
+  const corePlanningFiles = [".planning/PROJECT.md", ".planning/REQUIREMENTS.md", ".planning/ROADMAP.md", ".planning/STATE.md", "dev/task.json"];
+  const missingCorePlanningFiles = corePlanningFiles.filter((f) => !pathExists(f));
+  if (missingCorePlanningFiles.length === corePlanningFiles.length) {
+    // None of the core planning files exist — safe to write all
     console.log(`[adopt] Writing new files: ${missingFiles.join(", ")}`);
     writeProjectPlan(plan);
+  } else if (missingCorePlanningFiles.length > 0) {
+    console.log(`[adopt] Some planning files already exist. Skipping writeProjectPlan to avoid overwriting.`);
+    console.log(`[adopt] Missing (not written): ${missingCorePlanningFiles.join(", ")}`);
   } else {
     console.log("[adopt] All planning files already exist — skipping writeProjectPlan.");
   }
@@ -217,11 +226,28 @@ function writeAdoptionFiles(plan, { projectDescription, workGoal, currentStatus,
 
   // Write AGENTS.md only if it doesn't exist
   if (!pathExists("AGENTS.md")) {
-    const scaffoldAgentsMd = readText("AGENTS.md");
-    if (scaffoldAgentsMd) {
-      writeText("AGENTS.md", scaffoldAgentsMd);
-      console.log("[adopt] AGENTS.md created.");
-    }
+    const defaultAgentsMd = [
+      `# ${plan.projectName ?? "Project"} — Agent Instructions`,
+      "",
+      "## Overview",
+      "",
+      plan.positioning || plan.description || "An AI-assisted project.",
+      "",
+      "## Workflow",
+      "",
+      "- Read `dev/task.json` to find tasks assigned to you.",
+      "- Follow `.planning/STATE.md` for current project state.",
+      "- After completing a task, update its status in `dev/task.json` and append to `dev/progress.txt`.",
+      "",
+      "## Conventions",
+      "",
+      "- Use TypeScript for all new code.",
+      "- Write tests before implementation (TDD).",
+      "- Keep commits small and focused.",
+      ""
+    ].join("\n");
+    writeText("AGENTS.md", defaultAgentsMd);
+    console.log("[adopt] AGENTS.md created with default content.");
   }
 
   console.log("");
@@ -255,6 +281,10 @@ function detectFailureCategory(text) {
 }
 
 function extractJsonObject(text) {
+  if (text == null) {
+    throw new Error("AI did not return any output (stdout was null/undefined).");
+  }
+
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
 
@@ -265,8 +295,9 @@ function extractJsonObject(text) {
   return JSON.parse(text.slice(start, end + 1));
 }
 
-async function runPromptWithSimpleRetry({ config, model, prompt, label, maxRetries = 3, waitSeconds = 15 }) {
+async function runPromptWithSimpleRetry({ config, model, prompt, label, maxRetries = 3, maxQuotaRetries = 5, waitSeconds = 15 }) {
   let attempt = 0;
+  let quotaAttempts = 0;
 
   while (true) {
     attempt += 1;
@@ -279,16 +310,26 @@ async function runPromptWithSimpleRetry({ config, model, prompt, label, maxRetri
     const failureCategory = detectFailureCategory(detail);
     const isQuota = failureCategory === "quota";
 
+    if (isQuota) {
+      quotaAttempts += 1;
+    }
+
     if (!isQuota && attempt >= maxRetries) {
       throw new Error(
         `${label} failed after ${maxRetries} attempts.` + (detail ? `\n${detail}` : "")
       );
     }
 
+    if (isQuota && quotaAttempts >= maxQuotaRetries) {
+      throw new Error(
+        `${label} failed after ${maxQuotaRetries} consecutive quota/rate-limit errors. Giving up.` + (detail ? `\n${detail}` : "")
+      );
+    }
+
     console.log("");
     console.log(
       `[retry] ${label} failed on attempt ${attempt}. ` +
-        `${isQuota ? "Quota/rate limit detected" : "AI runner error"}. ` +
+        `${isQuota ? `Quota/rate limit detected (${quotaAttempts}/${maxQuotaRetries})` : "AI runner error"}. ` +
         `Waiting ${formatDuration(waitSeconds)} before retrying...`
     );
     if (detail) {

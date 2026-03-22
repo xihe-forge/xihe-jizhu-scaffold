@@ -230,7 +230,10 @@ function quoteArg(token) {
   }
 
   if (/[\s"]/u.test(token)) {
-    return `"${token.replace(/"/gu, "\\\"")}"`;
+    const escaped = process.platform === "win32"
+      ? token.replace(/"/gu, "\"\"")
+      : token.replace(/"/gu, "\\\"");
+    return `"${escaped}"`;
   }
 
   return token;
@@ -253,7 +256,8 @@ function tokenizeArgs(input) {
       continue;
     }
 
-    if (character === "\\") {
+    // Backslash only escapes outside single quotes (POSIX behavior)
+    if (character === "\\" && quote !== "'") {
       escaping = true;
       continue;
     }
@@ -470,13 +474,14 @@ export function resolveRunnerProfile(config) {
 }
 
 export function renderRunnerSummary(config) {
+  const normalized = normalizeAutopilotConfig(config);
   const runner = resolveRunnerProfile(config);
   const detail = runner.mode === "claude"
     ? `permission=${runner.permissionMode}`
     : runner.mode === "codex"
       ? `sandbox=${runner.sandboxMode}`
       : runner.mode === "gemini"
-        ? `model=${runner.command}`
+        ? `model=${normalized.models?.execution || normalized.models?.planning || "default"}`
         : `transport=${runner.promptTransport}`;
 
   return `${getRunnerModeLabel(runner.mode)} (${runner.command || "not configured"}, ${detail})`;

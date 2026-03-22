@@ -5,7 +5,7 @@ This command orchestrates the impeccable skill module for frontend design work.
 ## Setup Check
 
 First check if `.impeccable.md` exists in the project root. If not, run the teach-impeccable setup:
-- Read `.ai/skills/impeccable/teach-impeccable.md` and follow its instructions to gather design context.
+- Read `.ai/skills/impeccable/source/skills/teach-impeccable/SKILL.md` and follow its instructions to gather design context.
 
 ## Design Workflow
 
@@ -15,14 +15,14 @@ Based on the request, select the appropriate skill:
 
 | Intent | Skill File |
 |--------|-----------|
-| Create new UI | `.ai/skills/impeccable/frontend-design.md` |
-| Polish before shipping | `.ai/skills/impeccable/polish.md` |
-| Audit quality | `.ai/skills/impeccable/audit.md` |
-| Evaluate design | `.ai/skills/impeccable/critique.md` |
-| Improve resilience | `.ai/skills/impeccable/harden.md` |
-| Align to design system | `.ai/skills/impeccable/normalize.md` |
-| Improve performance | `.ai/skills/impeccable/optimize.md` |
-| Simplify complexity | `.ai/skills/impeccable/distill.md` |
-| Extract components | `.ai/skills/impeccable/extract.md` |
+| Create new UI | `.ai/skills/impeccable/source/skills/frontend-design/SKILL.md` |
+| Polish before shipping | `.ai/skills/impeccable/source/skills/polish/SKILL.md` |
+| Audit quality | `.ai/skills/impeccable/source/skills/audit/SKILL.md` |
+| Evaluate design | `.ai/skills/impeccable/source/skills/critique/SKILL.md` |
+| Improve resilience | `.ai/skills/impeccable/source/skills/harden/SKILL.md` |
+| Align to design system | `.ai/skills/impeccable/source/skills/normalize/SKILL.md` |
+| Improve performance | `.ai/skills/impeccable/source/skills/optimize/SKILL.md` |
+| Simplify complexity | `.ai/skills/impeccable/source/skills/distill/SKILL.md` |
+| Extract components | `.ai/skills/impeccable/source/skills/extract/SKILL.md` |
 
-Read the selected skill file and follow its instructions. Reference files are in `.ai/skills/impeccable/reference/` for typography, color, spatial, motion, interaction, responsive, and UX writing guidance.
+Read the selected skill file and follow its instructions. 

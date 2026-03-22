@@ -7,13 +7,13 @@ Target: $ARGUMENTS
 Run both audit modules in sequence:
 
 ### 1. Aesthetic Audit (impeccable)
-Read and apply `.ai/skills/impeccable/audit.md`:
+Read and apply `.ai/skills/impeccable/source/skills/audit/SKILL.md`:
 - Accessibility, performance, theming, responsive checks
 - Anti-AI-slop detection (AI color palette, glassmorphism, gradient text, generic fonts)
 - Generate severity-rated findings report
 
 ### 2. Engineering Audit (Vercel Web Interface Guidelines)
-Read and apply `.ai/skills/vercel-web-design/web-design-guidelines.md`:
+Read and apply `.ai/skills/vercel-web-design/skills/web-design-guidelines/SKILL.md`:
 - Fetch latest guidelines from the source URL in the skill file
 - Check against all rules
 - Output findings in `file:line` format

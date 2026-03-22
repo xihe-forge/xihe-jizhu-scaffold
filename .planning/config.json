@@ -39,14 +39,14 @@
       "enabled": true,
       "blocking": true,
       "recipe": ".ai/recipes/review-tech-design.md",
-      "tools": ["impeccable"],
+      "tools": ["impeccable", "vercel-web-design"],
       "triggers": ["docs/tech/", "docs/design/"]
     },
     "code_review": {
       "enabled": true,
       "blocking": true,
       "recipe": ".ai/recipes/review-code.md",
-      "tools": ["impeccable"],
+      "tools": ["impeccable", "vercel-web-design"],
       "triggers": ["apps/", "packages/"]
     },
     "test_coverage_review": {

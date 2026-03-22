@@ -96,6 +96,7 @@ function Test-CodexAvailable {
     .SYNOPSIS
     Checks if Codex CLI is installed and available.
     #>
+    $ErrorActionPreference = 'Stop'
     $exe = Find-CodexExe
     if (-not $exe) { return $false }
     try {
@@ -187,6 +188,8 @@ function Invoke-Codex {
         [hashtable]$ProjectConfig = @{}
     )
 
+    $ErrorActionPreference = 'Stop'
+
     if (-not $TaskId -or $TaskId.Trim() -eq "") {
         throw "TaskId must not be empty"
     }
@@ -242,6 +245,8 @@ function Invoke-Codex {
     # Step 3: DryRun check
     if ($DryRun) {
         Write-Host "[codex-bridge] DryRun mode - task file generated at: $TaskFilePath" -ForegroundColor Cyan
+        # Clean up worktree to prevent leak in DryRun mode
+        try { Remove-CodexWorktree -TaskId $TaskId -ProjectRoot $ProjectRoot } catch {}
         return @{
             Status       = "dry-run"
             ExitCode     = -1
@@ -291,7 +296,7 @@ $taskContent
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     if ($codexExe -match '\.(cmd|bat)$') {
         $psi.FileName = $env:COMSPEC  # cmd.exe
-        $psi.Arguments = "/c `"$codexExe $codexArgs`""
+        $psi.Arguments = "/c `"`"$codexExe`" $codexArgs`""
     } else {
         $psi.FileName = $codexExe
         $psi.Arguments = $codexArgs
@@ -344,7 +349,6 @@ $taskContent
 
         # Step 8: Monitor loop
         $lastOutputAt = Get-Date
-        $logLines = [System.Collections.Generic.List[string]]::new()
 
         # Initialize log file
         $header = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Codex execution started for task: $TaskId"
@@ -355,7 +359,6 @@ $taskContent
             $line = $null
             while ($stdoutLines.TryDequeue([ref]$line)) {
                 $lastOutputAt = Get-Date
-                $logLines.Add($line)
                 [System.IO.File]::AppendAllText($logFile, "$line`n", [System.Text.Encoding]::UTF8)
 
                 # Print condensed output
@@ -411,7 +414,9 @@ $taskContent
             [System.IO.File]::AppendAllText($logFile, "[STDERR] $errLine`n", [System.Text.Encoding]::UTF8)
         }
 
-        $exitCode = $process.ExitCode
+        # If process was killed (timeout/stale), ExitCode may be undefined
+        try { $exitCode = $process.ExitCode } catch { $exitCode = -1 }
+        if ($null -eq $exitCode) { $exitCode = -1 }
         $duration = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 1)
 
     } catch {
@@ -493,7 +498,7 @@ $taskContent
         DiffSummary  = $diffSummary
         Duration     = $duration
         LogFile      = $logFile
-        Timestamp    = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+        Timestamp    = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     }
 
     # Write result JSON

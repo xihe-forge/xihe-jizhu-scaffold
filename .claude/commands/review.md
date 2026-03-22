@@ -8,9 +8,9 @@ Read and apply the following review recipes in order:
 4. `.ai/recipes/error-handling-and-logging.md` — Error safety and logging standards
 
 For frontend code, also apply the external skill modules:
-- `.ai/skills/impeccable/audit.md` — Visual quality and anti-AI-slop audit
-- `.ai/skills/impeccable/critique.md` — Design effectiveness review
-- `.ai/skills/vercel-web-design/web-design-guidelines.md` — Web Interface Guidelines compliance
+- `.ai/skills/impeccable/source/skills/audit/SKILL.md` — Visual quality and anti-AI-slop audit
+- `.ai/skills/impeccable/source/skills/critique/SKILL.md` — Design effectiveness review
+- `.ai/skills/vercel-web-design/skills/web-design-guidelines/SKILL.md` — Web Interface Guidelines compliance
 
 Target files or pattern: $ARGUMENTS
 

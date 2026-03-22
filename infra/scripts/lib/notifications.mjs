@@ -195,10 +195,8 @@ export function notifyStateChange(oldState, newState, context = {}) {
     details.reason = newState.lastFailureHint ?? "user interrupted";
   }
 
-  // Non-blocking notify — use .catch to swallow any unexpected throw
-  try {
-    notify(event, details);
-  } catch {
-    // swallow
-  }
+  // Non-blocking notify — attach .catch() to handle the returned Promise
+  notify(event, details).catch((err) => {
+    appendNotificationLog(formatLogLine("notify_error", `Failed to notify ${event}: ${err?.message ?? err}`));
+  });
 }

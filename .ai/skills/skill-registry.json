@@ -123,7 +123,7 @@
       "skills": {
         "web-design-guidelines": {
           "file": "skills/web-design-guidelines/SKILL.md",
-          "role": "engineering_qa",
+          "role": "engineering_review",
           "when": "Reviewing frontend code for Web Interface Guidelines compliance"
         }
       }
@@ -168,8 +168,7 @@
 
   "phase_mapping": {
     "implement_frontend": {
-      "design": ["impeccable/frontend-design"],
-      "reference": ["impeccable/reference/*"]
+      "design": ["impeccable/frontend-design"]
     },
     "review_frontend": {
       "aesthetic_review": ["impeccable/critique", "impeccable/audit"],

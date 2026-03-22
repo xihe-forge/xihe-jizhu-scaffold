@@ -15,6 +15,9 @@ const LOCK_RETRY_DELAY_MS = 100;
 /** Set of lock file paths currently held by this process, for cleanup on exit. */
 const heldLocks = new Set();
 
+/** Global shutdown flag — set by signal handlers to let other listeners save state first. */
+export let shuttingDown = false;
+
 function registerExitCleanup() {
   if (registerExitCleanup._registered) return;
   registerExitCleanup._registered = true;
@@ -30,8 +33,18 @@ function registerExitCleanup() {
   };
 
   process.on("exit", cleanup);
-  process.on("SIGINT", () => { cleanup(); process.exit(130); });
-  process.on("SIGTERM", () => { cleanup(); process.exit(143); });
+  process.on("SIGINT", () => {
+    shuttingDown = true;
+    cleanup();
+    // Do NOT call process.exit() here — let the caller's SIGINT handler
+    // (e.g. autopilot-start.mjs) save state and exit explicitly.
+    // The "exit" event handler above ensures lock cleanup regardless.
+  });
+  process.on("SIGTERM", () => {
+    shuttingDown = true;
+    cleanup();
+    // Same rationale as SIGINT — let caller handlers decide when to exit.
+  });
   process.on("uncaughtException", (err) => { cleanup(); throw err; });
 }
 
@@ -224,6 +237,10 @@ function quoteShellArg(arg) {
   }
 
   if (/[^\w./:-]/u.test(value)) {
+    // Windows cmd.exe uses "" to escape quotes; bash/sh uses \"
+    if (process.platform === "win32") {
+      return `"${value.replace(/"/gu, '""')}"`;
+    }
     return `"${value.replace(/"/gu, '\\"')}"`;
   }
 

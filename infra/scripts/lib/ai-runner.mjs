@@ -39,7 +39,8 @@ export async function runTextPrompt({ config, prompt, model }) {
     });
   }
 
-  const useShellWrapper = requiresCommandShell(command) && (runner.mode === "claude" || runner.promptTransport === "stdin");
+  const needsShell = requiresCommandShell(command);
+  const useShellWrapper = needsShell && (runner.mode === "claude" || runner.promptTransport === "stdin");
   const child = useShellWrapper
     ? spawn(buildShellCommandLine(command, args), {
         cwd: process.cwd(),
@@ -49,7 +50,7 @@ export async function runTextPrompt({ config, prompt, model }) {
     : spawn(command, args, {
         cwd: process.cwd(),
         stdio: ["pipe", "pipe", "pipe"],
-        shell: requiresCommandShell(command)
+        shell: needsShell
       });
 
   if (runner.mode === "claude" || runner.promptTransport === "stdin") {
@@ -60,13 +61,20 @@ export async function runTextPrompt({ config, prompt, model }) {
   let stdout = "";
   let stderr = "";
   let spawnError = null;
+  const MAX_BUFFER_BYTES = 10 * 1024 * 1024; // 10 MB
 
   child.stdout.on("data", (chunk) => {
     stdout += chunk.toString("utf8");
+    if (stdout.length > MAX_BUFFER_BYTES) {
+      stdout = stdout.slice(stdout.length - MAX_BUFFER_BYTES);
+    }
   });
 
   child.stderr.on("data", (chunk) => {
     stderr += chunk.toString("utf8");
+    if (stderr.length > MAX_BUFFER_BYTES) {
+      stderr = stderr.slice(stderr.length - MAX_BUFFER_BYTES);
+    }
   });
 
   child.on("error", (error) => {

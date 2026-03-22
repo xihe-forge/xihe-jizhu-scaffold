@@ -2,7 +2,6 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import {
-  pathExists,
   promptChoice,
   promptText,
   promptYesNo,
@@ -111,7 +110,8 @@ function scanSkills(modulePath, moduleName) {
 
     // Derive skill name from directory structure
     const dirName = path.dirname(relativePath).replace(/\\/g, "/");
-    const skillName = frontmatter.name || dirName.split("/").pop() || path.basename(filePath, ".md");
+    const dirPart = dirName.split("/").pop();
+    const skillName = frontmatter.name || (dirPart && dirPart !== "." ? dirPart : moduleName);
 
     skills.push({
       name: skillName,

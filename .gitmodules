@@ -1,6 +1,6 @@
 [submodule ".ai/skills/xihe-search-forge"]
 	path = .ai/skills/xihe-search-forge
-	url = git@github.com:xihe-forge/xihe-search-forge.git
+	url = https://github.com/xihe-forge/xihe-search-forge.git
 [submodule ".ai/skills/impeccable"]
 	path = .ai/skills/impeccable
 	url = https://github.com/pbakaus/impeccable.git

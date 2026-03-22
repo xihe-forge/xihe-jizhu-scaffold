@@ -1,4 +1,4 @@
-import { appendFileSync, createWriteStream, rmSync } from "node:fs";
+import { appendFileSync, createWriteStream, rmSync, readdirSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { spawn, execSync } from "node:child_process";
@@ -42,8 +42,14 @@ function loadConfig() {
   return loadAutopilotConfig({ persist: true });
 }
 
+/** Cached state to avoid redundant file reads within a single loop iteration. */
+let _stateCache = null;
+
 function loadState() {
-  return readJson(".autopilot/state.json", {
+  if (_stateCache) {
+    return _stateCache;
+  }
+  const state = readJson(".autopilot/state.json", {
     status: "idle",
     sessionId: "",
     retryCount: 0,
@@ -52,13 +58,24 @@ function loadState() {
     lastTaskId: null,
     updatedAt: new Date().toISOString()
   });
+  _stateCache = state;
+  return state;
 }
 
 function saveState(nextState) {
-  writeJson(".autopilot/state.json", {
+  const merged = {
     ...nextState,
     updatedAt: new Date().toISOString()
-  });
+  };
+  writeJson(".autopilot/state.json", merged);
+  // Update cache so subsequent loadState() calls in the same iteration
+  // return the freshly saved state without re-reading from disk.
+  _stateCache = merged;
+}
+
+/** Invalidate the state cache. Call once per loop iteration to pick up external changes. */
+function invalidateStateCache() {
+  _stateCache = null;
 }
 
 function clearStopSignal() {
@@ -257,23 +274,69 @@ function computeMaxReviewRounds({ taskCount = 0, sourceFileCount = 0, configMaxR
 
 /**
  * Count source files in apps/ and packages/ directories.
+ * Uses Node.js fs to work cross-platform (the previous `find` command always returned 0 on Windows).
  * Falls back to 0 if directories don't exist.
  * @returns {number}
  */
 function countSourceFiles() {
-  try {
-    const output = execSync(
-      'find apps packages -type f \\( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.mjs" -o -name "*.vue" -o -name "*.svelte" \\) 2>/dev/null | wc -l',
-      { encoding: "utf-8", cwd: rootDir }
-    ).trim();
-    return parseInt(output, 10) || 0;
-  } catch {
-    return 0;
+  const SOURCE_EXTENSIONS = new Set([".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs", ".vue", ".svelte"]);
+
+  function countRecursive(dir) {
+    let count = 0;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return 0;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        // Skip node_modules and hidden directories
+        if (entry.name === "node_modules" || entry.name.startsWith(".")) {
+          continue;
+        }
+        count += countRecursive(fullPath);
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (SOURCE_EXTENSIONS.has(ext)) {
+          count += 1;
+        }
+      }
+    }
+    return count;
   }
+
+  const appsDir = path.join(rootDir, "apps");
+  const packagesDir = path.join(rootDir, "packages");
+  return countRecursive(appsDir) + countRecursive(packagesDir);
 }
 
 function resolveModel(task, config) {
-  return config.models.planning;
+  if (!task) {
+    // Idle / no task — use planning model
+    return config.models.planning;
+  }
+
+  // Opus-assigned tasks or planning/review types use the planning (opus) model
+  const assignee = (task.assignee ?? "").toLowerCase();
+  if (assignee === "opus") {
+    return config.models.planning;
+  }
+
+  // Codex/Gemini tasks are delegated via the orchestrator prompt, which needs opus
+  if (assignee === "codex" || assignee === "gemini") {
+    return config.models.planning;
+  }
+
+  // Tasks explicitly typed as planning, review, or docs use the planning model
+  const taskType = (task.type ?? "").toLowerCase();
+  if (taskType === "planning" || taskType === "review" || taskType === "docs" || taskType === "research") {
+    return config.models.planning;
+  }
+
+  // Default: implementation tasks use the execution model (sonnet)
+  return config.models.execution ?? config.models.planning;
 }
 
 /**
@@ -1904,6 +1967,10 @@ async function main() {
   const taskRetryMap = new Map();
 
   while (true) {
+    // Invalidate cached state at the start of each iteration so we pick up
+    // any external modifications (e.g. user editing state.json).
+    invalidateStateCache();
+
     if (pathExists(".autopilot/.stop")) {
       saveState({ ...loadState(), status: "stopped" });
       notify("stopped", { reason: "stop signal detected" }).catch?.(() => {});

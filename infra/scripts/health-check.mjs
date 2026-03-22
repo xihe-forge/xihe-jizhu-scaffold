@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 
@@ -185,14 +185,8 @@ let secretsFound = false;
 
 for (const dir of sourceDirs) {
   try {
-    // Use a platform-compatible grep approach via Node
+    // Scan files directly in Node
     const absoluteDir = path.join(root, dir);
-    const grepCmd = process.platform === "win32"
-      ? `findstr /s /r /i /c:"key.*=.*'" /c:"secret.*=.*'" /c:"password.*=.*'" /c:"token.*=.*'" "${absoluteDir}\\*.ts" "${absoluteDir}\\*.tsx" "${absoluteDir}\\*.js" "${absoluteDir}\\*.mjs" 2>nul`
-      : `grep -rE --include="*.ts" --include="*.tsx" --include="*.js" --include="*.mjs" --exclude-dir=node_modules --exclude="*.test.*" --exclude="*.spec.*" -l '["'"'"'][^"'"'"']*(?:key|secret|password|token)[^"'"'"']*["'"'"']\\s*[:=]\\s*["'"'"'][^"'"'"']{8,}' "${absoluteDir}" 2>/dev/null`;
-
-    // Instead of complex shell commands, scan files directly in Node
-    const { readdirSync, statSync } = await import("node:fs");
 
     function walkDir(dirPath, fileList = []) {
       let entries;
@@ -271,16 +265,26 @@ const buildCmd = hasPnpm ? "pnpm build" : "npm run build";
 
 console.log(`\nRunning build: ${buildCmd} ...`);
 let buildExitCode = 0;
+let buildStdout = "";
+let buildStderr = "";
 try {
-  execSync(buildCmd, { cwd: root, stdio: "pipe" });
+  buildStdout = execSync(buildCmd, { cwd: root, stdio: "pipe", encoding: "utf8" });
 } catch (err) {
   buildExitCode = err.status ?? 1;
+  buildStdout = err.stdout ?? "";
+  buildStderr = err.stderr ?? "";
 }
 
 if (buildExitCode === 0) {
   pass(`Build succeeded (${buildCmd})`);
 } else {
   fail(`Build failed with exit code ${buildExitCode} (${buildCmd})`);
+  if (buildStderr) {
+    console.log(`\n--- Build stderr ---\n${buildStderr.slice(0, 2000)}`);
+  }
+  if (buildStdout) {
+    console.log(`\n--- Build stdout ---\n${buildStdout.slice(0, 2000)}`);
+  }
 }
 
 // Verify build output directory exists
@@ -290,7 +294,6 @@ const existingOutputDirs = buildOutputDirs.filter((d) => existsSync(path.join(ro
 // Also check in apps/ subdirectories
 const appsDir = path.join(root, "apps");
 if (existsSync(appsDir)) {
-  const { readdirSync } = await import("node:fs");
   try {
     const appDirs = readdirSync(appsDir);
     for (const app of appDirs) {
@@ -425,21 +428,29 @@ if (config?.optional_modules?.payment?.enabled) {
   let supportEmailFound = false;
 
   for (const dir of searchDirs) {
-    try {
-      const content = execSync(
-        process.platform === "win32"
-          ? `findstr /s /r /i "support@\\|help@\\|contact@" "${path.join(root, dir)}\\*.ts" "${path.join(root, dir)}\\*.tsx" 2>nul`
-          : `grep -r --include="*.ts" --include="*.tsx" --include="*.json" -l "support@\\|help@\\|contact@" "${path.join(root, dir)}" 2>/dev/null`,
-        { encoding: "utf8", stdio: "pipe" }
-      ).trim();
-
-      if (content) {
-        supportEmailFound = true;
-        break;
+    const dirPath = path.join(root, dir);
+    const filesToCheck = [];
+    const collectFiles = (d) => {
+      for (const entry of readdirSync(d, { withFileTypes: true })) {
+        const full = path.join(d, entry.name);
+        if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
+          collectFiles(full);
+        } else if (/\.(ts|tsx|json)$/u.test(entry.name)) {
+          filesToCheck.push(full);
+        }
       }
-    } catch {
-      // grep returns non-zero when no match found — that's okay
+    };
+    try { collectFiles(dirPath); } catch { /* dir may not exist */ }
+    for (const file of filesToCheck) {
+      try {
+        const text = readFileSync(file, "utf8");
+        if (supportEmailPattern.test(text)) {
+          supportEmailFound = true;
+          break;
+        }
+      } catch { /* skip unreadable files */ }
     }
+    if (supportEmailFound) break;
   }
 
   // Also check config.json for support email

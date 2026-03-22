@@ -255,8 +255,10 @@ async function runPromptWithRetry({
   intakeStateStore
 }) {
   const retryConfig = getIntakeRetryConfig(scriptedInput);
+  const maxQuotaRetries = Number(getArg("max-quota-retries") ?? scriptedInput?.maxQuotaRetries ?? 5);
   let lastResult = null;
   let runnerFailureCount = 0;
+  let quotaFailureCount = 0;
   let totalAttempts = 0;
   const savedRetry = intakeStateStore.get().retry;
   if (savedRetry?.pendingStage === pendingStage) {
@@ -290,6 +292,9 @@ async function runPromptWithRetry({
     const waitSeconds = quotaResetWaitSeconds ?? retryConfig.retryWaitSeconds;
     const nextRetryAt = new Date(Date.now() + waitSeconds * 1000).toISOString();
     const nextRunnerFailureCount = isQuotaFailure ? runnerFailureCount : runnerFailureCount + 1;
+    if (isQuotaFailure) {
+      quotaFailureCount += 1;
+    }
 
     intakeStateStore.patch({
       status: isQuotaFailure ? "waiting_quota" : "waiting_retry",
@@ -309,10 +314,15 @@ async function runPromptWithRetry({
       break;
     }
 
+    if (isQuotaFailure && quotaFailureCount >= maxQuotaRetries) {
+      runnerFailureCount = nextRunnerFailureCount;
+      break;
+    }
+
     console.log("");
     console.log(
       `[retry] ${stageLabel} failed on attempt ${totalAttempts}. ` +
-        `${isQuotaFailure ? "Quota or rate limit detected" : "AI runner returned an error"}. ` +
+        `${isQuotaFailure ? `Quota or rate limit detected (${quotaFailureCount}/${maxQuotaRetries} quota retries)` : "AI runner returned an error"}. ` +
         `Waiting ${formatDuration(waitSeconds)} before retrying...`
     );
     if (isQuotaFailure) {
@@ -328,8 +338,11 @@ async function runPromptWithRetry({
   }
 
   const finalDetail = [lastResult?.stderr, lastResult?.error, lastResult?.stdout].filter(Boolean).join("\n").trim();
+  const reason = quotaFailureCount >= maxQuotaRetries
+    ? `${maxQuotaRetries} consecutive quota/rate-limit failures`
+    : `${retryConfig.maxRetries} non-quota attempts`;
   throw new Error(
-    `${stageLabel} failed after ${retryConfig.maxRetries} non-quota attempts.` +
+    `${stageLabel} failed after ${reason}.` +
       (finalDetail ? `\n${finalDetail}` : "")
   );
 }
@@ -367,6 +380,10 @@ async function promptYesNoValue({ rl, scriptedInput, key, label, defaultValue = 
 }
 
 function extractJsonObject(text) {
+  if (text == null) {
+    throw new Error("AI did not return any output (stdout was null/undefined).");
+  }
+
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
 

@@ -1,4 +1,5 @@
-import { readJson, readText, replaceMarkdownSection, slugify, writeJson, writeText } from "./utils.mjs";
+import { existsSync } from "node:fs";
+import { readJson, readText, replaceMarkdownSection, resolvePath, slugify, writeJson, writeText } from "./utils.mjs";
 
 export function detectCurrentRootName() {
   return readJson("package.json", {})?.name ?? "robust-ai-scaffold";
@@ -24,6 +25,9 @@ export function readCurrentPositioning() {
 
 function applyReplacements(replacements, relativePaths) {
   for (const relativePath of relativePaths) {
+    if (!existsSync(resolvePath(relativePath))) {
+      continue;
+    }
     let content = readText(relativePath);
     for (const [from, to] of replacements) {
       if (!from || from === to) {
@@ -48,7 +52,6 @@ export function initializeProjectIdentity({ projectName, scope, description, pos
   ];
 
   const targetFiles = [
-    "README.md",
     "package.json",
     ".env.example",
     ".planning/PROJECT.md",
@@ -93,7 +96,12 @@ export function initializeProjectIdentity({ projectName, scope, description, pos
   );
   writeText(".planning/STATE.md", stateMarkdown);
 
-  const readme = readText("README.md").replace(
+  let readme = readText("README.md");
+  for (const [from, to] of replacements) {
+    if (!from || from === to) continue;
+    readme = readme.split(from).join(to);
+  }
+  readme = readme.replace(
     "A resilient project scaffold that blends:",
     `${description}\n\nThis project currently blends:`
   );
@@ -191,16 +199,16 @@ export function renderStateMarkdown(plan) {
 }
 
 function normalizeTask(task, index) {
-  const rawId = task.id || `T${String(index + 1).padStart(3, "0")}`;
+  const rawId = task.id ?? `T${String(index + 1).padStart(3, "0")}`;
   return {
     id: rawId,
-    phase: task.phase || "Phase 1",
-    type: task.type || "planning",
-    name: task.name || `Task ${index + 1}`,
-    description: task.description || "Describe this task.",
-    priority: task.priority || "P1",
-    status: task.status || "todo",
-    assignee: task.assignee || "owner",
+    phase: task.phase ?? "Phase 1",
+    type: task.type ?? "planning",
+    name: task.name ?? `Task ${index + 1}`,
+    description: task.description ?? "Describe this task.",
+    priority: task.priority ?? "P1",
+    status: task.status ?? "todo",
+    assignee: task.assignee ?? "owner",
     depends_on: Array.isArray(task.depends_on) ? task.depends_on : [],
     acceptance_criteria: Array.isArray(task.acceptance_criteria) ? task.acceptance_criteria : []
   };
@@ -254,9 +262,23 @@ export function writeProjectPlan(plan) {
   });
 }
 
-export function appendProgressEntry(entry) {
-  const existing = readText("dev/progress.txt").trim();
+export function appendProgressEntry(entry, maxRetries = 3) {
   const normalizedEntry = String(entry ?? "").replace(/^\[\d{4}-\d{2}-\d{2}\]\s*/u, "").trim();
   const line = `[${new Date().toISOString().slice(0, 10)}] ${normalizedEntry}`;
-  writeText("dev/progress.txt", existing ? `${existing}\n${line}\n` : `${line}\n`);
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const existing = readText("dev/progress.txt").trim();
+      writeText("dev/progress.txt", existing ? `${existing}\n${line}\n` : `${line}\n`);
+      return;
+    } catch (err) {
+      if ((err.code === "EACCES" || err.code === "EPERM") && attempt < maxRetries) {
+        // Brief synchronous delay before retry
+        const sharedBuffer = new SharedArrayBuffer(4);
+        Atomics.wait(new Int32Array(sharedBuffer), 0, 0, 50 * (attempt + 1));
+        continue;
+      }
+      throw err;
+    }
+  }
 }

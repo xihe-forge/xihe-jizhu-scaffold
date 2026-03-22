@@ -9,12 +9,23 @@
  * @returns {string[]} Array of skill IDs that participate in a cycle (empty = no cycles)
  */
 export function checkCircularDependencies(registry) {
+  if (!registry.skills) {
+    return [];
+  }
+
   const allSkills = {};
   for (const [moduleName, moduleData] of Object.entries(registry.skills)) {
     if (moduleData.skills) {
       for (const [skillName, skillData] of Object.entries(moduleData.skills)) {
         allSkills[`${moduleName}/${skillName}`] = skillData.depends_on || null;
       }
+    }
+  }
+
+  // Warn about dangling depends_on references
+  for (const [skillId, dep] of Object.entries(allSkills)) {
+    if (dep && !allSkills[dep]) {
+      console.warn(`Warning: Skill "${skillId}" has depends_on "${dep}" which does not exist in the registry.`);
     }
   }
 
