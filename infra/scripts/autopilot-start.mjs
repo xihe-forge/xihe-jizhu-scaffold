@@ -460,7 +460,6 @@ function checkGeminiPrerequisites() {
  */
 function buildCodexDelegationBlock(task) {
   const rawId = task.id;
-  const safeId = sanitizeTaskId(rawId);
   // Use absolute paths so commands work regardless of CWD
   // Escape single quotes for safe embedding in PS -Command strings (#R4-6)
   const absRoot = rootDir.replace(/\//g, "\\").replace(/'/g, "''");
@@ -504,7 +503,6 @@ function buildCodexDelegationBlock(task) {
  */
 function buildGeminiDelegationBlock(task) {
   const rawId = task.id;
-  const safeId = sanitizeTaskId(rawId);
   const absRoot = rootDir.replace(/\//g, "\\").replace(/'/g, "''");
   const modulePath = `${absRoot}\\gemini-bridge\\GeminiBridge.psm1`;
   const escapePs = (s) => (s ?? "").replace(/'/g, "''").replace(/[\r\n]+/g, " ");
@@ -1917,7 +1915,8 @@ async function main() {
     let readyTasks = getReadyTasks();
 
     // Pre-flight: if any ready task needs codex, verify prerequisites — skip codex tasks if not available (#R4-3)
-    const codexCheck = checkCodexPrerequisites();
+    const hasCodexTasks = readyTasks.some(t => t.assignee === "codex");
+    const codexCheck = hasCodexTasks ? checkCodexPrerequisites() : { available: false, issues: [] };
     if (!codexCheck.available) {
       const codexTasks = readyTasks.filter((t) => t.assignee === "codex");
       if (codexTasks.length > 0) {
@@ -1929,7 +1928,8 @@ async function main() {
     }
 
     // Pre-flight: if any ready task needs gemini, verify prerequisites — skip gemini tasks if not available
-    const geminiCheck = checkGeminiPrerequisites();
+    const hasGeminiTasks = readyTasks.some(t => t.assignee === "gemini");
+    const geminiCheck = hasGeminiTasks ? checkGeminiPrerequisites() : { available: false, issues: [] };
     if (!geminiCheck.available) {
       const geminiTasks = readyTasks.filter((t) => t.assignee === "gemini");
       if (geminiTasks.length > 0) {
