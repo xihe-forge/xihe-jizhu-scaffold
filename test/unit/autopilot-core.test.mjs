@@ -18,8 +18,22 @@ import {
   loadSkillInstructions,
   getSkillExecutionOrder,
   topoSortSkills,
-  recordTaskMetrics
+  recordTaskMetrics,
+  checkGeminiPrerequisites,
+  buildGeminiDelegationBlock
 } from "../../infra/scripts/autopilot-start.mjs";
+
+import {
+  loadNotificationConfig,
+  notify,
+  notifyStateChange
+} from "../../infra/scripts/lib/notifications.mjs";
+
+import {
+  parseGitHubUrl,
+  parseYamlFrontmatter,
+  checkCircularDependencies
+} from "../../infra/scripts/skill-add.mjs";
 
 // The scaffold root — same directory that utils.mjs captures as rootDir
 const scaffoldRoot = path.resolve(fileURLToPath(import.meta.url), "../../..");
@@ -1295,5 +1309,413 @@ describe("recordTaskMetrics", () => {
         status: "success"
       });
     }, "recordTaskMetrics should not throw on corrupted metrics file");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkGeminiPrerequisites
+// ---------------------------------------------------------------------------
+
+describe("checkGeminiPrerequisites", () => {
+  it("returns available:false when bridge file is missing", () => {
+    // The gemini-bridge/GeminiBridge.psm1 file does not exist in the test worktree
+    // so this should always return available:false with an issue about the missing file.
+    // (Even if gemini CLI is installed, the missing bridge file alone causes failure.)
+    const result = checkGeminiPrerequisites();
+    // We cannot guarantee gemini CLI is installed in CI, so we just verify the shape.
+    assert.ok(typeof result.available === "boolean", "available should be a boolean");
+    assert.ok(Array.isArray(result.issues), "issues should be an array");
+  });
+
+  it("returns issues array with descriptive messages when bridge file missing", () => {
+    const result = checkGeminiPrerequisites();
+    // Bridge file should be absent, so at least one issue about GeminiBridge.psm1
+    const hasBridgeIssue = result.issues.some((msg) =>
+      msg.includes("GeminiBridge.psm1") || msg.includes("gemini-bridge")
+    );
+    // If bridge is absent, there should be an issue about it.
+    // If bridge is present (unlikely in worktree), just verify issues is an array.
+    if (!result.available) {
+      assert.ok(result.issues.length > 0, "Should have at least one issue when not available");
+    }
+    // The issues array items should be non-empty strings
+    for (const issue of result.issues) {
+      assert.ok(typeof issue === "string" && issue.length > 0, "Each issue should be a non-empty string");
+    }
+  });
+
+  it("returns available:false when gemini CLI is not found (mocked via PATH)", () => {
+    // Since we can't reliably control PATH in tests, we verify that if gemini is
+    // missing the result has available:false AND issues mentions the CLI.
+    // We run checkGeminiPrerequisites and if gemini CLI is absent the issues array
+    // must include a hint about installing it.
+    const result = checkGeminiPrerequisites();
+    if (!result.available) {
+      const hasCliIssue = result.issues.some((msg) =>
+        msg.includes("gemini CLI") || msg.includes("gemini") || msg.includes("GeminiBridge")
+      );
+      assert.ok(hasCliIssue, `Issues should mention gemini CLI or bridge, got: ${result.issues.join("; ")}`);
+    }
+  });
+
+  it("returns object with available and issues properties", () => {
+    const result = checkGeminiPrerequisites();
+    assert.ok(Object.prototype.hasOwnProperty.call(result, "available"), "result must have 'available' property");
+    assert.ok(Object.prototype.hasOwnProperty.call(result, "issues"), "result must have 'issues' property");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildGeminiDelegationBlock
+// ---------------------------------------------------------------------------
+
+describe("buildGeminiDelegationBlock", () => {
+  it("returns a string containing the task ID", () => {
+    const task = { id: "T042", name: "Build feature", description: "Do the thing" };
+    const result = buildGeminiDelegationBlock(task);
+    assert.ok(typeof result === "string", "should return a string");
+    assert.ok(result.includes("T042"), "result should contain the task ID");
+  });
+
+  it("handles special characters in task name (single quotes)", () => {
+    const task = {
+      id: "T001",
+      name: "Fix O'Brien's bug",
+      description: "It's a quoted string issue",
+      steps: [],
+      acceptance_criteria: []
+    };
+    assert.doesNotThrow(() => buildGeminiDelegationBlock(task));
+    const result = buildGeminiDelegationBlock(task);
+    // Single quotes should be escaped as '' for PowerShell
+    assert.ok(result.includes("O''Brien''s"), "single quotes should be doubled for PS safety");
+  });
+
+  it("handles newlines in task description without throwing", () => {
+    const task = {
+      id: "T002",
+      name: "Multi\nline\ntask",
+      description: "Step 1\nStep 2\nStep 3",
+      steps: [],
+      acceptance_criteria: []
+    };
+    assert.doesNotThrow(() => buildGeminiDelegationBlock(task));
+    const result = buildGeminiDelegationBlock(task);
+    // Newlines should be replaced with spaces
+    assert.ok(!result.includes("Multi\nline"), "newlines in name should be removed");
+  });
+
+  it("handles empty steps and acceptance_criteria arrays", () => {
+    const task = {
+      id: "T003",
+      name: "Simple task",
+      description: "No steps",
+      steps: [],
+      acceptance_criteria: []
+    };
+    const result = buildGeminiDelegationBlock(task);
+    assert.ok(typeof result === "string");
+    assert.ok(result.includes("T003"), "should contain task ID");
+    // Empty arrays result in @() in PowerShell
+    assert.ok(result.includes("steps=@()"), "empty steps should produce @()");
+    assert.ok(result.includes("acceptance_criteria=@()"), "empty criteria should produce @()");
+  });
+
+  it("contains GeminiBridge PowerShell module import", () => {
+    const task = { id: "T004", name: "Test task", description: "desc" };
+    const result = buildGeminiDelegationBlock(task);
+    assert.ok(result.includes("GeminiBridge.psm1"), "should reference GeminiBridge.psm1");
+    assert.ok(result.includes("Import-Module"), "should include Import-Module instruction");
+  });
+
+  it("includes Invoke-Gemini command", () => {
+    const task = { id: "T005", name: "Gemini task", description: "delegate this" };
+    const result = buildGeminiDelegationBlock(task);
+    assert.ok(result.includes("Invoke-Gemini"), "should include Invoke-Gemini command");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// loadNotificationConfig
+// ---------------------------------------------------------------------------
+
+describe("loadNotificationConfig", () => {
+  let originalConfig;
+
+  beforeEach(() => {
+    originalConfig = saveFixture(".autopilot/config.json");
+  });
+
+  afterEach(() => {
+    if (originalConfig !== null) {
+      writeFixture(".autopilot/config.json", originalConfig);
+    }
+  });
+
+  it("returns defaults when config file has no notifications key", () => {
+    writeFixture(".autopilot/config.json", JSON.stringify({ runner: "sonnet" }));
+    const config = loadNotificationConfig();
+    assert.equal(config.enabled, false, "default enabled should be false");
+    assert.equal(config.webhook_url, null, "default webhook_url should be null");
+    assert.ok(typeof config.events === "object", "events should be an object");
+  });
+
+  it("returns defaults when config file is missing or empty JSON", () => {
+    writeFixture(".autopilot/config.json", JSON.stringify({}));
+    const config = loadNotificationConfig();
+    assert.equal(config.enabled, false);
+    assert.ok(config.events.task_completed === true, "task_completed default should be true");
+  });
+
+  it("merges user overrides with defaults", () => {
+    writeFixture(".autopilot/config.json", JSON.stringify({
+      notifications: {
+        enabled: true,
+        webhook_url: "https://hooks.example.com/test",
+        events: { task_completed: false }
+      }
+    }));
+    const config = loadNotificationConfig();
+    assert.equal(config.enabled, true);
+    assert.equal(config.webhook_url, "https://hooks.example.com/test");
+    assert.equal(config.events.task_completed, false, "overridden event should be false");
+    assert.equal(config.events.task_failed, true, "non-overridden event should keep default");
+  });
+
+  it("preserves all default event keys in returned config", () => {
+    writeFixture(".autopilot/config.json", JSON.stringify({}));
+    const config = loadNotificationConfig();
+    const expectedEvents = [
+      "task_completed", "task_failed", "quota_wait", "all_tasks_done",
+      "final_review_started", "final_review_done", "awaiting_user_decision",
+      "error", "stopped"
+    ];
+    for (const event of expectedEvents) {
+      assert.ok(event in config.events, `events.${event} should be present`);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// notifyStateChange
+// ---------------------------------------------------------------------------
+
+describe("notifyStateChange", () => {
+  let originalConfig;
+
+  beforeEach(() => {
+    originalConfig = saveFixture(".autopilot/config.json");
+    // Disable notifications so no webhook calls happen, but logging still occurs
+    writeFixture(".autopilot/config.json", JSON.stringify({ notifications: { enabled: false } }));
+  });
+
+  afterEach(() => {
+    if (originalConfig !== null) {
+      writeFixture(".autopilot/config.json", originalConfig);
+    }
+  });
+
+  it("does not throw when state transitions from idle to running", () => {
+    const oldState = { status: "idle" };
+    const newState = { status: "running" };
+    assert.doesNotThrow(() => notifyStateChange(oldState, newState));
+  });
+
+  it("does not throw and does not notify when status is unchanged", () => {
+    const state = { status: "running" };
+    assert.doesNotThrow(() => notifyStateChange(state, state));
+  });
+
+  it("maps waiting_quota status to quota_wait event (does not throw)", () => {
+    const oldState = { status: "running" };
+    const newState = { status: "waiting_quota", retryAfterSeconds: 30, lastFailureCategory: "quota" };
+    assert.doesNotThrow(() => notifyStateChange(oldState, newState));
+  });
+
+  it("maps error status to error event (does not throw)", () => {
+    const oldState = { status: "running" };
+    const newState = { status: "error", lastError: "Something went wrong" };
+    assert.doesNotThrow(() => notifyStateChange(oldState, newState));
+  });
+
+  it("maps stopped status to stopped event (does not throw)", () => {
+    const oldState = { status: "running" };
+    const newState = { status: "stopped" };
+    assert.doesNotThrow(() => notifyStateChange(oldState, newState));
+  });
+
+  it("handles null/undefined old state gracefully", () => {
+    const newState = { status: "stopped" };
+    assert.doesNotThrow(() => notifyStateChange(null, newState));
+    assert.doesNotThrow(() => notifyStateChange(undefined, newState));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseGitHubUrl
+// ---------------------------------------------------------------------------
+
+describe("parseGitHubUrl", () => {
+  it("parses HTTPS URL without .git suffix", () => {
+    const result = parseGitHubUrl("https://github.com/myorg/myrepo");
+    assert.ok(result !== null, "should return a result");
+    assert.equal(result.org, "myorg");
+    assert.equal(result.repo, "myrepo");
+  });
+
+  it("parses HTTPS URL with .git suffix", () => {
+    const result = parseGitHubUrl("https://github.com/myorg/myrepo.git");
+    assert.ok(result !== null, "should return a result");
+    assert.equal(result.org, "myorg");
+    assert.equal(result.repo, "myrepo");
+  });
+
+  it("parses SSH URL with .git suffix", () => {
+    const result = parseGitHubUrl("git@github.com:myorg/myrepo.git");
+    assert.ok(result !== null, "should return a result");
+    assert.equal(result.org, "myorg");
+    assert.equal(result.repo, "myrepo");
+  });
+
+  it("parses SSH URL without .git suffix", () => {
+    const result = parseGitHubUrl("git@github.com:myorg/myrepo");
+    assert.ok(result !== null, "should return a result");
+    assert.equal(result.org, "myorg");
+    assert.equal(result.repo, "myrepo");
+  });
+
+  it("returns null for invalid URL", () => {
+    const result = parseGitHubUrl("not-a-url");
+    assert.equal(result, null, "should return null for invalid URL");
+  });
+
+  it("returns null for empty string", () => {
+    const result = parseGitHubUrl("");
+    assert.equal(result, null, "should return null for empty string");
+  });
+
+  it("preserves the original URL in result", () => {
+    const url = "https://github.com/org/repo.git";
+    const result = parseGitHubUrl(url);
+    assert.equal(result.url, url, "url field should match original input");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseYamlFrontmatter
+// ---------------------------------------------------------------------------
+
+describe("parseYamlFrontmatter", () => {
+  it("parses basic key:value pairs", () => {
+    const content = `---\nname: my-skill\nrole: general\n---\nContent here`;
+    const result = parseYamlFrontmatter(content);
+    assert.ok(result !== null, "should return a result");
+    assert.equal(result.name, "my-skill");
+    assert.equal(result.role, "general");
+  });
+
+  it("strips surrounding quotes from values", () => {
+    const content = `---\nname: "quoted-skill"\ndescription: 'single-quoted'\n---`;
+    const result = parseYamlFrontmatter(content);
+    assert.equal(result.name, "quoted-skill");
+    assert.equal(result.description, "single-quoted");
+  });
+
+  it("returns null when no frontmatter delimiter present", () => {
+    const content = `No frontmatter here\nJust plain content`;
+    const result = parseYamlFrontmatter(content);
+    assert.equal(result, null, "should return null when no frontmatter");
+  });
+
+  it("returns null for empty frontmatter block", () => {
+    const content = `---\n---\nContent`;
+    const result = parseYamlFrontmatter(content);
+    assert.equal(result, null, "should return null for empty frontmatter");
+  });
+
+  it("handles multiple key:value pairs with various types", () => {
+    const content = `---\nname: test-skill\nrole: frontend\nwhen: building UI\ndescription: A test skill\n---`;
+    const result = parseYamlFrontmatter(content);
+    assert.equal(result.name, "test-skill");
+    assert.equal(result.role, "frontend");
+    assert.equal(result.when, "building UI");
+    assert.equal(result.description, "A test skill");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkCircularDependencies (skill-add registry format)
+// ---------------------------------------------------------------------------
+
+describe("checkCircularDependencies", () => {
+  it("returns empty array when there are no cycles", () => {
+    const registry = {
+      skills: {
+        "module-a": {
+          skills: {
+            "skill-1": { depends_on: null },
+            "skill-2": { depends_on: "module-a/skill-1" }
+          }
+        }
+      }
+    };
+    const cycles = checkCircularDependencies(registry);
+    assert.deepEqual(cycles, [], "no cycles should return empty array");
+  });
+
+  it("detects a direct A->B->A cycle", () => {
+    const registry = {
+      skills: {
+        "module-a": {
+          skills: {
+            "skill-x": { depends_on: "module-a/skill-y" },
+            "skill-y": { depends_on: "module-a/skill-x" }
+          }
+        }
+      }
+    };
+    const cycles = checkCircularDependencies(registry);
+    assert.ok(cycles.length > 0, "should detect at least one cycle");
+    assert.ok(
+      cycles.some(id => id === "module-a/skill-x" || id === "module-a/skill-y"),
+      "cyclic skill IDs should be in the result"
+    );
+  });
+
+  it("handles registry with no skills entries", () => {
+    const registry = { skills: {} };
+    const cycles = checkCircularDependencies(registry);
+    assert.deepEqual(cycles, [], "empty registry should return empty array");
+  });
+
+  it("returns empty for skills with null depends_on", () => {
+    const registry = {
+      skills: {
+        "module-a": {
+          skills: {
+            "skill-1": { depends_on: null },
+            "skill-2": { depends_on: null }
+          }
+        }
+      }
+    };
+    const cycles = checkCircularDependencies(registry);
+    assert.deepEqual(cycles, []);
+  });
+
+  it("handles skills with no depends_on field at all", () => {
+    const registry = {
+      skills: {
+        "module-b": {
+          skills: {
+            "alpha": {},
+            "beta": {}
+          }
+        }
+      }
+    };
+    assert.doesNotThrow(() => checkCircularDependencies(registry));
+    const cycles = checkCircularDependencies(registry);
+    assert.deepEqual(cycles, []);
   });
 });

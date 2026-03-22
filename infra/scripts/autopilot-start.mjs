@@ -2387,4 +2387,4 @@ if (isDirectRun) {
 }
 
 // Export for testing
-export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds, loadSkillInstructions, getSkillExecutionOrder, topoSortSkills, recordTaskMetrics };
+export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds, loadSkillInstructions, getSkillExecutionOrder, topoSortSkills, recordTaskMetrics, checkGeminiPrerequisites, buildGeminiDelegationBlock };

@@ -169,6 +169,10 @@ function checkCircularDependencies(registry) {
   return cycles;
 }
 
+// --- Exports for testing ---
+
+export { parseGitHubUrl, parseYamlFrontmatter, checkCircularDependencies };
+
 // --- Main ---
 
 async function main() {
@@ -440,7 +444,10 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  console.error(`\nError: ${err.message}`);
-  process.exit(1);
-});
+const isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"));
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error(`\nError: ${err.message}`);
+    process.exit(1);
+  });
+}
