@@ -31,7 +31,7 @@
     "impeccable": {
       "version": "1.0.0",
       "description": "Frontend design generation and iterative refinement. Anti-AI-slop aesthetics.",
-      "source": "https://github.com/garkgodwin/impeccable",
+      "source": "https://github.com/pbakaus/impeccable",
       "license": "Apache 2.0",
       "path": ".ai/skills/impeccable",
       "trigger": {
@@ -41,62 +41,62 @@
       },
       "skills": {
         "frontend-design": {
-          "file": "frontend-design.md",
+          "file": "source/skills/frontend-design/SKILL.md",
           "role": "design_generator",
           "when": "Creating new UI components, pages, or layouts",
           "requires_context": true,
           "context_file": ".impeccable.md"
         },
         "teach-impeccable": {
-          "file": "teach-impeccable.md",
+          "file": "source/skills/teach-impeccable/SKILL.md",
           "role": "setup",
           "when": "First-time setup or when .impeccable.md is missing"
         },
         "polish": {
-          "file": "polish.md",
+          "file": "source/skills/polish/SKILL.md",
           "role": "design_refinement",
           "when": "Final quality pass before shipping frontend",
           "depends_on": "impeccable/audit"
         },
         "audit": {
-          "file": "audit.md",
+          "file": "source/skills/audit/SKILL.md",
           "role": "design_audit",
           "when": "Comprehensive UI quality audit (accessibility, performance, theming, responsive)"
         },
         "critique": {
-          "file": "critique.md",
+          "file": "source/skills/critique/SKILL.md",
           "role": "design_review",
           "when": "Evaluating design effectiveness and UX quality"
         },
         "harden": {
-          "file": "harden.md",
+          "file": "source/skills/harden/SKILL.md",
           "role": "design_hardening",
           "when": "Improving error handling, i18n, edge cases in UI"
         },
         "normalize": {
-          "file": "normalize.md",
+          "file": "source/skills/normalize/SKILL.md",
           "role": "design_consistency",
           "when": "Aligning implementation with design system",
           "depends_on": "impeccable/critique"
         },
         "optimize": {
-          "file": "optimize.md",
+          "file": "source/skills/optimize/SKILL.md",
           "role": "performance",
           "when": "Improving frontend performance (loading, rendering, bundle size)"
         },
         "distill": {
-          "file": "distill.md",
+          "file": "source/skills/distill/SKILL.md",
           "role": "design_simplification",
           "when": "Removing unnecessary UI complexity"
         },
         "extract": {
-          "file": "extract.md",
+          "file": "source/skills/extract/SKILL.md",
           "role": "component_extraction",
           "when": "Extracting reusable components and design tokens"
         }
       },
       "reference": {
-        "path": "reference/",
+        "path": "source/skills/frontend-design/reference/",
         "files": [
           "typography.md",
           "color-and-contrast.md",
@@ -112,7 +112,7 @@
     "vercel-web-design": {
       "version": "1.0.0",
       "description": "Web Interface Guidelines compliance review. Engineering-grade UX quality gate (accessibility, performance, standards).",
-      "source": "https://github.com/vercel-labs/web-interface-guidelines",
+      "source": "https://github.com/vercel-labs/agent-skills",
       "license": "MIT",
       "path": ".ai/skills/vercel-web-design",
       "trigger": {
@@ -122,7 +122,7 @@
       },
       "skills": {
         "web-design-guidelines": {
-          "file": "web-design-guidelines.md",
+          "file": "skills/web-design-guidelines/SKILL.md",
           "role": "engineering_qa",
           "when": "Reviewing frontend code for Web Interface Guidelines compliance"
         }

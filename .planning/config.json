@@ -9,14 +9,6 @@
     "auto_advance": false,
     "nyquist_validation": true
   },
-  "parallelization": {
-    "enabled": true,
-    "plan_level": true,
-    "task_level": false,
-    "skip_checkpoints": false,
-    "max_concurrent_agents": 3,
-    "min_plans_for_parallel": 2
-  },
   "gates": {
     "confirm_project": true,
     "confirm_phases": true,
@@ -40,28 +32,28 @@
       "enabled": true,
       "blocking": true,
       "recipe": ".ai/recipes/review-mrd-prd.md",
-      "tools": ["pm-skills", "superpowers"],
+      "tools": [],
       "triggers": ["docs/mrd/", "docs/prd/", ".planning/REQUIREMENTS.md"]
     },
     "tech_design_review": {
       "enabled": true,
       "blocking": true,
       "recipe": ".ai/recipes/review-tech-design.md",
-      "tools": ["impeccable", "ui-ux-pro-max-skill", "open-lovable", "superpowers"],
+      "tools": ["impeccable"],
       "triggers": ["docs/tech/", "docs/design/"]
     },
     "code_review": {
       "enabled": true,
       "blocking": true,
       "recipe": ".ai/recipes/review-code.md",
-      "tools": ["superpowers", "impeccable", "ui-ux-pro-max-skill"],
+      "tools": ["impeccable"],
       "triggers": ["apps/", "packages/"]
     },
     "test_coverage_review": {
       "enabled": true,
       "blocking": true,
       "recipe": ".ai/recipes/review-test-coverage.md",
-      "tools": ["superpowers", "pm-skills"],
+      "tools": [],
       "triggers": ["test/", "*.test.*", "*.spec.*"],
       "require_full_prd_coverage": true
     },
@@ -69,14 +61,14 @@
       "enabled": true,
       "blocking": false,
       "recipe": ".ai/recipes/review-marketing.md",
-      "tools": ["marketingskills", "pm-skills"],
+      "tools": [],
       "triggers": ["docs/marketing/", "docs/mrd/"]
     },
     "seo_aeo_review": {
       "enabled": true,
       "blocking": false,
       "recipe": ".ai/recipes/review-seo-aeo.md",
-      "tools": ["xihe-seo-aeo"],
+      "tools": ["xihe-search-forge"],
       "triggers": ["apps/web/", "apps/*/src/app/", "public/", "src/app/"]
     }
   },
@@ -105,32 +97,16 @@
     "convergence": "zero_new_issues"
   },
   "review_tools": {
-    "pm-skills": {
-      "path": "opensource/pm-skills",
-      "description": "65 PM skills — MRD/PRD/GTM validation"
-    },
-    "superpowers": {
-      "path": "opensource/superpowers",
-      "description": "TDD, code review, systematic debugging"
-    },
     "impeccable": {
-      "path": "opensource/impeccable",
+      "path": ".ai/skills/impeccable",
       "description": "Frontend design anti-patterns, 17 audit commands"
     },
-    "ui-ux-pro-max-skill": {
-      "path": "opensource/ui-ux-pro-max-skill",
-      "description": "Design system validation (50+ styles, 161 palettes)"
+    "vercel-web-design": {
+      "path": ".ai/skills/vercel-web-design",
+      "description": "Vercel-style web design patterns and best practices"
     },
-    "open-lovable": {
-      "path": "opensource/open-lovable",
-      "description": "React component architecture reference"
-    },
-    "marketingskills": {
-      "path": "opensource/marketingskills",
-      "description": "34+ marketing skills — SEO, CRO, growth, positioning"
-    },
-    "xihe-seo-aeo": {
-      "path": "D:/workspace/ai/research/xiheAi/xihe-seo-aeo",
+    "xihe-search-forge": {
+      "path": ".ai/skills/xihe-search-forge",
       "description": "SEO + AEO audit — crawl, Schema validation, llms.txt, FAQ extraction, Lighthouse comparison",
       "skills": ["seo-audit", "aeo-audit", "seo-report", "aeo-monitor"],
       "scripts": {

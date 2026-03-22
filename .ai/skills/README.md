@@ -7,20 +7,21 @@ Pluggable, independent skill modules that extend the scaffold's capabilities. Ea
 ```
 .ai/skills/
 ├── skill-registry.json          # Module registry + phase mapping
-├── impeccable/                  # Frontend design generation & refinement
-│   ├── frontend-design.md       # Core design skill (anti-AI-slop)
-│   ├── teach-impeccable.md      # One-time design context setup
-│   ├── polish.md                # Final visual quality pass
-│   ├── audit.md                 # Comprehensive UI audit
-│   ├── critique.md              # Design effectiveness review
-│   ├── harden.md                # UI resilience (error, i18n, edge cases)
-│   ├── normalize.md             # Design system alignment
-│   ├── optimize.md              # Frontend performance
-│   ├── distill.md               # Simplify over-designed UI
-│   ├── extract.md               # Extract reusable components/tokens
-│   └── reference/               # Typography, color, motion, spatial, interaction, responsive, UX writing
-├── vercel-web-design/           # Engineering-grade UX quality gate
-│   └── web-design-guidelines.md # Web Interface Guidelines compliance
+├── impeccable/                  # Frontend design generation & refinement (git submodule)
+│   └── source/skills/
+│       ├── frontend-design/SKILL.md  # Core design skill (anti-AI-slop)
+│       │   └── reference/            # Typography, color, motion, spatial, interaction, responsive, UX writing
+│       ├── teach-impeccable/SKILL.md # One-time design context setup
+│       ├── polish/SKILL.md           # Final visual quality pass
+│       ├── audit/SKILL.md            # Comprehensive UI audit
+│       ├── critique/SKILL.md         # Design effectiveness review
+│       ├── harden/SKILL.md           # UI resilience (error, i18n, edge cases)
+│       ├── normalize/SKILL.md        # Design system alignment
+│       ├── optimize/SKILL.md         # Frontend performance
+│       ├── distill/SKILL.md          # Simplify over-designed UI
+│       └── extract/SKILL.md          # Extract reusable components/tokens
+├── vercel-web-design/           # Engineering-grade UX quality gate (git submodule)
+│   └── skills/web-design-guidelines/SKILL.md  # Web Interface Guidelines compliance
 └── xihe-search-forge/           # SEO & AEO audit + monitoring (git submodule)
     └── skills/
         ├── seo-audit/SKILL.md   # Full SEO audit with Lighthouse
@@ -38,11 +39,13 @@ Pluggable, independent skill modules that extend the scaffold's capabilities. Ea
 
 ## Integration Methods
 
-| Module | Method | Update |
+All skill modules are managed as **git submodules** and updated via `git submodule update --remote`.
+
+| Module | Source | Update |
 |--------|--------|--------|
-| impeccable | Copied into repo | Manual |
-| vercel-web-design | Copied into repo | Manual |
-| xihe-search-forge | **Git submodule** | `git submodule update --remote` |
+| impeccable | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | `git submodule update --remote .ai/skills/impeccable` |
+| vercel-web-design | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | `git submodule update --remote .ai/skills/vercel-web-design` |
+| xihe-search-forge | [xihe-forge/xihe-search-forge](https://github.com/xihe-forge/xihe-search-forge) | `git submodule update --remote .ai/skills/xihe-search-forge` |
 
 ## Phase Mapping
 
