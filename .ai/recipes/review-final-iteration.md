@@ -74,7 +74,7 @@ Each reviewer independently checks:
 
 1. **Code quality** — per review-code.md recipe
 2. **Test coverage** — per review-test-coverage.md, build PRD coverage matrix
-3. **TDD compliance** — per superpowers methodology
+3. **TDD compliance** — per scaffold TDD methodology (RED-GREEN-REFACTOR)
 4. **Frontend quality** — per impeccable audit (if frontend exists)
 5. **Security** — no hardcoded secrets, proper auth checks
 

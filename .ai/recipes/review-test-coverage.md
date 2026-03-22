@@ -7,10 +7,7 @@ This review ensures **every PRD requirement has corresponding test coverage** �
 
 ## Required Tools
 
-| Tool | Path | Purpose |
-|------|------|---------|
-| **superpowers** | `opensource/superpowers` | TDD methodology, verification-before-completion |
-| **pm-skills** | `opensource/pm-skills` | PRD structure validation for traceability |
+This review uses the scaffold's built-in TDD methodology and PRD traceability checks. No external skill modules required.
 
 ## Core Principle: Full PRD Coverage
 
@@ -38,9 +35,9 @@ For each PRD requirement without a test:
 2. **Is it in scope for this phase?** If yes → must be tested. If deferred → document in ROADMAP.md.
 3. **Is it an edge case?** Edge cases still need tests. "Unlikely" is not "untestable".
 
-### Step 3: Validate Test Quality (superpowers)
+### Step 3: Validate Test Quality
 
-Apply superpowers `test-driven-development` skill:
+Apply scaffold TDD methodology:
 
 1. **Independence**: Can each test run in isolation?
 2. **Determinism**: Does each test produce the same result every time?
@@ -87,7 +84,7 @@ Record in `dev/review/REVIEW-TEST-COVERAGE-{phase}.md`:
 - Covered: {M} ({percentage}%)
 - Missing: {list with reasons}
 
-## Test Quality (superpowers)
+## Test Quality
 - [ ] All tests independent
 - [ ] All tests deterministic
 - [ ] All tests fast enough

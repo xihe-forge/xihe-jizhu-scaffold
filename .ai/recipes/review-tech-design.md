@@ -9,10 +9,8 @@ This review is **BLOCKING** — no implementation of the designed component may 
 
 | Tool | Path | Purpose |
 |------|------|---------|
-| **impeccable** | `opensource/impeccable` | Frontend design anti-pattern detection, 17 audit commands |
-| **ui-ux-pro-max-skill** | `opensource/ui-ux-pro-max-skill` | Design system validation (50+ styles, 161 palettes, 99 UX guidelines) |
-| **open-lovable** | `opensource/open-lovable` | React app design reference — validates component architecture |
-| **superpowers** | `opensource/superpowers` | Systematic debugging & verification methodology |
+| **impeccable** | `.ai/skills/impeccable` | Frontend design anti-pattern detection, audit & critique |
+| **vercel-web-design** | `.ai/skills/vercel-web-design` | Engineering UX quality gate (a11y, performance, standards) |
 
 ## Review Checklist
 
@@ -37,12 +35,13 @@ Run impeccable `/audit` and `/critique` commands against design specs:
 6. **Responsive Design**: Mobile-first? Breakpoints defined? Fluid design tokens?
 7. **UX Writing**: Button labels action-oriented? Error messages helpful?
 
-### Stage 3: Design System Validation (ui-ux-pro-max-skill)
+### Stage 3: Design System Validation (impeccable + vercel-web-design)
 
 1. **Style consistency**: Does the chosen design style (glassmorphism, minimalism, etc.) apply consistently?
 2. **Color palette**: Is the palette from an established system or custom-justified?
 3. **Component inventory**: Are all UI components listed with variants and states?
 4. **Platform coverage**: Are target platforms (web, mobile, desktop) addressed?
+5. **Engineering UX**: Accessibility standards met? Performance benchmarks defined?
 
 ### Stage 4: Anti-Pattern Detection (impeccable)
 
@@ -53,7 +52,7 @@ Run impeccable `/normalize` to detect:
 3. **No accessibility gaps**: All interactive elements keyboard-accessible
 4. **No responsive breakage**: Layout works at all viewport sizes
 
-### Stage 5: Component Architecture (open-lovable)
+### Stage 5: Component Architecture
 
 1. **Component decomposition**: Are components properly decomposed (atoms → molecules → organisms)?
 2. **State management**: Is state ownership clear for each component?

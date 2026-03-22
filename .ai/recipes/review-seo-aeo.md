@@ -9,7 +9,7 @@ Triggers: changes to `apps/web/`, `apps/*/src/app/`, `public/`, `src/app/`.
 
 | Tool | Path | Purpose |
 |------|------|---------|
-| **xihe-seo-aeo** | `D:/workspace/ai/research/xiheAi/xihe-seo-aeo` | Crawl pages, extract structured data, score SEO/AEO readiness |
+| **xihe-search-forge** | `.ai/skills/xihe-search-forge` | SEO & AEO audit, AI search monitoring, impact reporting |
 
 ## Review Process
 
@@ -18,7 +18,7 @@ Triggers: changes to `apps/web/`, `apps/*/src/app/`, `public/`, `src/app/`.
 Run the crawler against all public-facing URLs:
 
 ```bash
-cd D:/workspace/ai/research/xiheAi/xihe-seo-aeo
+cd .ai/skills/xihe-search-forge
 node scripts/crawl-page.mjs <URL> --output data/baselines/<project>-<date>.json
 ```
 
