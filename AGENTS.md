@@ -11,9 +11,8 @@ AI agents MUST read this file before every round of work.
 2. `.planning/REQUIREMENTS.md`: in-scope and out-of-scope behavior
 3. `.planning/ROADMAP.md`: milestone and phase sequence
 4. `.planning/STATE.md`: current status, decisions, blockers, next step
-5. `docs/intake/PROJECT-INTAKE.md`: the original intake conversation and framing
-6. `dev/task.json`: execution queue with priorities, dependencies, and acceptance criteria
-7. `dev/progress.txt`: chronological progress log
+5. `dev/task.json`: execution queue with priorities, dependencies, and acceptance criteria
+6. `dev/progress.txt`: chronological progress log
 
 ### Working Order
 
@@ -216,7 +215,7 @@ Review gate configuration is in `.planning/config.json` under `review_gates`.
 | **Testing complete** | `.ai/recipes/review-test-coverage.md` | (scaffold built-in) | YES |
 | **Marketing materials created** | `.ai/recipes/review-marketing.md` | (scaffold built-in) | No (advisory) |
 | **Public pages deployed** | `.ai/recipes/review-seo-aeo.md` | xihe-search-forge | No (advisory) |
-| **All tasks complete** | `.ai/recipes/review-final-iteration.md` | impeccable, vercel-web-design | YES |
+| **All tasks complete** | `.ai/recipes/review-final-iteration.md` | impeccable, vercel-web-design, xihe-search-forge | YES |
 
 **Supplementary Checklists** (referenced by review recipes):
 - `.ai/recipes/frontend-review-checklist.md` — real-world frontend bugs (layout, auth UI, pricing, responsive, i18n). **Mandatory** for all frontend code reviews.
@@ -249,7 +248,7 @@ Tests must cover the entire PRD. After all implementation tasks in a phase compl
 
 ### Final Iteration Review (Multi-AI Convergence)
 
-When ALL tasks in a phase are marked "done", the autopilot enters the **final iteration review** phase.
+When ALL tasks across the entire project are marked "done", the autopilot enters the **final iteration review** phase.
 This is configured in `.planning/config.json` under `final_review`.
 
 **Architecture:**
@@ -318,7 +317,7 @@ These are **not** part of the core autopilot — they extend it.
 
 **How they're used:**
 - During **implementation**: autopilot injects impeccable's `frontend-design.md` instructions for frontend tasks
-- During **review**: code reviewers apply impeccable `audit.md` (aesthetic) + vercel `web-design-guidelines.md` (engineering)
+- During **review**: code reviewers apply impeccable `audit/SKILL.md` (aesthetic) + vercel `web-design-guidelines/SKILL.md` (engineering)
 - During **review_seo**: xihe-search-forge runs SEO audit, AEO audit (9-dimension), citation monitoring, and impact reporting
 - During **final review**: all three modules are used as parallel quality gates
 - **CLI commands**: `/design`, `/ux-audit`, `/review` invoke these skills directly

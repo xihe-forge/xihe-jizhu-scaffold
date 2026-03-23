@@ -48,7 +48,10 @@ function registerExitCleanup() {
     cleanup();
     // Same rationale as SIGINT — let caller handlers decide when to exit.
   });
-  process.on("uncaughtException", (err) => { cleanup(); throw err; });
+  process.on("uncaughtException", (err) => {
+    try { cleanup(); } catch { /* ignore cleanup errors */ }
+    throw err;
+  });
 }
 
 registerExitCleanup();
@@ -88,7 +91,7 @@ function acquireLock(absolutePath) {
       return lockPath;
     } catch (err) {
       if (err.code !== "EEXIST" || attempt === LOCK_RETRY_COUNT) {
-        throw new Error(`Could not acquire lock for ${absolutePath} after ${attempt} attempts: ${err.message} — another process may be writing to this file. Wait and retry, or delete the .lock file if the other process has crashed.`);
+        throw new Error(`Lock acquisition failed (${err.code}) — ${lockPath}. Another process may hold the lock, or check file permissions.`);
       }
       // Synchronous sleep via a busy-wait is avoided; we use a short Atomics wait instead.
       const sharedBuffer = new SharedArrayBuffer(4);
@@ -390,7 +393,10 @@ export function sleep(ms) {
 export function isWorkingTreeClean() {
   try {
     return !execSync("git status --porcelain", { encoding: "utf8", timeout: 10000 }).trim();
-  } catch { return true; }
+  } catch (e) {
+    console.warn("[git] Could not determine working tree status:", e.message);
+    return true;
+  }
 }
 
 /**

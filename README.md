@@ -26,7 +26,7 @@ The autopilot always runs the strongest model (Opus) as orchestrator. Opus reads
 - **Gemini CLI** -- delegated via the `gemini-bridge/` PowerShell module for frontend/design tasks
 - **Opus direct** -- planning/review tasks completed by the orchestrator itself
 
-Task assignment is controlled by the `assignee` field in `dev/task.json` (`"sonnet"`, `"codex"`, or `"opus"`).
+Task assignment is controlled by the `assignee` field in `dev/task.json` (`"sonnet"`, `"codex"`, `"gemini"`, or `"opus"`).
 
 ### Quota Self-Healing
 
@@ -183,7 +183,7 @@ The scaffold's core architecture (autopilot, intake, review pipeline) is self-co
 
 | Module | Role | Source |
 |--------|------|--------|
-| **impeccable** | Frontend design generation & refinement, anti-AI-slop aesthetics (9 skills + 7 reference docs) | [impeccable](https://github.com/pbakaus/impeccable) |
+| **impeccable** | Frontend design generation & refinement, anti-AI-slop aesthetics (10 skills + 7 reference docs) | [impeccable](https://github.com/pbakaus/impeccable) |
 | **vercel-web-design** | Engineering UX quality gate (accessibility, performance, standards) | [vercel-labs](https://github.com/vercel-labs/agent-skills) |
 | **xihe-search-forge** | SEO/GEO/AEO audit, AI search engine optimization, structured data validation | [xihe-forge](https://github.com/xihe-forge/xihe-search-forge) |
 

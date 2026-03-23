@@ -32,44 +32,38 @@
       "enabled": true,
       "blocking": true,
       "recipe": ".ai/recipes/review-mrd-prd.md",
-      "tools": [],
-      "triggers": ["docs/mrd/", "docs/prd/", ".planning/REQUIREMENTS.md"]
+      "tools": []
     },
     "tech_design_review": {
       "enabled": true,
       "blocking": true,
       "recipe": ".ai/recipes/review-tech-design.md",
-      "tools": ["impeccable", "vercel-web-design"],
-      "triggers": ["docs/tech/", "docs/design/"]
+      "tools": ["impeccable", "vercel-web-design"]
     },
     "code_review": {
       "enabled": true,
       "blocking": true,
       "recipe": ".ai/recipes/review-code.md",
-      "tools": ["impeccable", "vercel-web-design"],
-      "triggers": ["apps/", "packages/"]
+      "tools": ["impeccable", "vercel-web-design"]
     },
     "test_coverage_review": {
       "enabled": true,
       "blocking": true,
       "recipe": ".ai/recipes/review-test-coverage.md",
       "tools": [],
-      "triggers": ["test/", "*.test.*", "*.spec.*"],
       "require_full_prd_coverage": true
     },
     "marketing_review": {
       "enabled": true,
       "blocking": false,
       "recipe": ".ai/recipes/review-marketing.md",
-      "tools": [],
-      "triggers": ["docs/marketing/", "docs/mrd/"]
+      "tools": []
     },
     "seo_aeo_review": {
       "enabled": true,
       "blocking": false,
       "recipe": ".ai/recipes/review-seo-aeo.md",
-      "tools": ["xihe-search-forge"],
-      "triggers": ["apps/web/", "apps/*/src/app/", "public/", "src/app/"]
+      "tools": ["xihe-search-forge"]
     }
   },
   "optional_modules": {

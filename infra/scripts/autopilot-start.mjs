@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { spawn, execSync, spawnSync } from "node:child_process";
 import process from "node:process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   buildShellCommandLine,
   ensureDir,
@@ -92,7 +93,7 @@ function getTasks() {
   return raw.filter((task) => task && task.id);
 }
 
-/** Find the highest-priority todo task whose dependencies are all satisfied. */
+/** @deprecated Use getReadyTasks()[0] instead. Kept for backward compatibility with tests. */
 function getNextTask() {
   const tasks = getTasks();
 
@@ -105,7 +106,11 @@ function getNextTask() {
       const dependencies = task.depends_on ?? [];
       const depsSatisfied = dependencies.every((dependencyId) => {
         const dependencyTask = tasks.find((candidate) => candidate.id === dependencyId);
-        return !dependencyTask || dependencyTask.status === "done";
+        if (!dependencyTask) {
+          console.warn(`WARNING: Task "${task.id}" depends on unknown task "${dependencyId}" — treating as unsatisfied. Check dev/task.json for typos or remove the stale dependency.`);
+          return false;
+        }
+        return dependencyTask.status === "done";
       });
 
       if (depsSatisfied) {
@@ -199,7 +204,11 @@ function getReadyTasks() {
       const dependencies = task.depends_on ?? [];
       const depsSatisfied = dependencies.every((dependencyId) => {
         const dependencyTask = tasks.find((candidate) => candidate.id === dependencyId);
-        return !dependencyTask || dependencyTask.status === "done";
+        if (!dependencyTask) {
+          console.warn(`WARNING: Task "${task.id}" depends on unknown task "${dependencyId}" — treating as unsatisfied. Check dev/task.json for typos or remove the stale dependency.`);
+          return false;
+        }
+        return dependencyTask.status === "done";
       });
 
       if (depsSatisfied) {
@@ -547,13 +556,11 @@ function checkCodexPrerequisites() {
     issues.push("codex-bridge/CodexBridge.psm1 not found");
   }
   // Check codex CLI availability (not just file existence)
-  try {
-    const result = execSync("codex --version", { timeout: 10000, stdio: "pipe", shell: process.platform === "win32" });
-    if (!result || !result.toString().trim()) {
-      issues.push("codex CLI found but returned empty version");
+  {
+    const result = spawnSync("codex", ["--version"], { stdio: "pipe", timeout: 5000 });
+    if (result.status !== 0) {
+      issues.push("codex CLI not found or not executable (install with: npm install -g @openai/codex)");
     }
-  } catch {
-    issues.push("codex CLI not found or not executable (install with: npm install -g @openai/codex)");
   }
   return { available: issues.length === 0, issues };
 }
@@ -594,8 +601,12 @@ function buildCodexDelegationBlock(task) {
   const absRoot = rootDir.replace(/\//g, "\\").replace(/'/g, "''");
   const modulePath = `${absRoot}\\codex-bridge\\CodexBridge.psm1`;
   // Escape single quotes in rawId for safe PS single-quoted string embedding
-  // Escape for PS single-quoted strings: ' → '' and strip newlines (single-line assignment)
-  const escapePs = (s) => (s ?? "").replace(/'/g, "''").replace(/[\r\n]+/g, " ");
+  // Escape for PS single-quoted strings: backtick → ``, $ → `$, ' → '', newlines stripped
+  const escapePs = (s) => (s ?? "")
+    .replace(/`/g, "``")        // must come first to avoid double-escaping
+    .replace(/\$/g, "`$")       // prevent variable expansion
+    .replace(/'/g, "''")        // PS single-quote escape
+    .replace(/[\r\n]+/g, " ");  // collapse newlines to space
   const escapedRawId = escapePs(rawId);
   const escapedName = escapePs(task.name);
   return [
@@ -634,7 +645,12 @@ function buildGeminiDelegationBlock(task) {
   const rawId = task.id;
   const absRoot = rootDir.replace(/\//g, "\\").replace(/'/g, "''");
   const modulePath = `${absRoot}\\gemini-bridge\\GeminiBridge.psm1`;
-  const escapePs = (s) => (s ?? "").replace(/'/g, "''").replace(/[\r\n]+/g, " ");
+  // Escape for PS single-quoted strings: backtick → ``, $ → `$, ' → '', newlines stripped
+  const escapePs = (s) => (s ?? "")
+    .replace(/`/g, "``")        // must come first to avoid double-escaping
+    .replace(/\$/g, "`$")       // prevent variable expansion
+    .replace(/'/g, "''")        // PS single-quote escape
+    .replace(/[\r\n]+/g, " ");  // collapse newlines to space
   const escapedRawId = escapePs(rawId);
   const escapedName = escapePs(task.name);
   return [
@@ -1715,7 +1731,7 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
   }
 
   const logStream = createWriteStream(".autopilot/logs/autopilot.log", { flags: "a" });
-  const outputStream = createWriteStream(".autopilot/logs/assistant-output.log", { flags: "a" });
+  const outputStream = createWriteStream(".autopilot/logs/assistant-output.log", { flags: "w" });
   /** Mutable accumulator for usage metrics captured from streamed events */
   const usageAccum = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
 
@@ -1753,12 +1769,26 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
   let sigkillTimer = null;
   const timeoutHandle = setTimeout(() => {
     timedOut = true;
-    console.error(`[timeout] Task exceeded ${taskTimeoutSeconds}s limit. Sending SIGTERM to child process.`);
-    child.kill("SIGTERM");
+    console.error(`[timeout] Task exceeded ${taskTimeoutSeconds}s limit. Terminating child process tree.`);
+    if (process.platform === "win32") {
+      // On Windows, child.kill() only kills the wrapper (cmd.exe), not grandchildren.
+      // Use taskkill /T (tree) to kill the entire process tree.
+      try {
+        spawnSync("taskkill", ["/T", "/F", "/PID", String(child.pid)], { stdio: "ignore", timeout: 5000 });
+      } catch { /* best-effort */ }
+    } else {
+      child.kill("SIGTERM");
+    }
     sigkillTimer = setTimeout(() => {
       if (!child.killed) {
-        console.error("[timeout] Child did not exit after SIGTERM. Sending SIGKILL.");
-        child.kill("SIGKILL");
+        console.error("[timeout] Child did not exit after termination signal. Force-killing.");
+        if (process.platform === "win32") {
+          try {
+            spawnSync("taskkill", ["/T", "/F", "/PID", String(child.pid)], { stdio: "ignore", timeout: 5000 });
+          } catch { /* best-effort */ }
+        } else {
+          child.kill("SIGKILL");
+        }
       }
     }, 5000);
   }, taskTimeoutSeconds * 1000);
@@ -2077,6 +2107,7 @@ async function main() {
   }
 
   saveState({ ...loadState(), status: "starting" });
+  invalidateStateCache();
 
   process.on("SIGINT", () => {
     notify("stopped", { reason: "SIGINT (user interrupt)" }).catch?.(() => {});
@@ -2523,18 +2554,17 @@ async function main() {
             // Review round failed (quota, error, etc.) — handle via normal retry logic
             if (reviewResult.failureCategory === "quota") {
               console.log("Quota hit during final review. Will retry after wait.");
-              // Decrement round so it retries the same round
-              saveState({ ...loadState(), finalReviewRound: reviewRound - 1 });
             }
 
-            // Fall through to normal error handling below
+            // Fall through to normal error handling below (merge quota round-decrement into single saveState)
             saveState({
               ...loadState(),
               status: reviewResult.failureCategory === "quota" ? "waiting_quota" : "waiting_retry",
               sessionId: reviewResult.sessionId,
               lastExitCode: reviewResult.exitCode,
               lastFailureCategory: reviewResult.failureCategory ?? null,
-              lastFailureHint: reviewResult.failureHint ?? ""
+              lastFailureHint: reviewResult.failureHint ?? "",
+              ...(reviewResult.failureCategory === "quota" ? { finalReviewRound: reviewRound - 1 } : {})
             });
 
             if (runOnce) break;
@@ -2628,7 +2658,7 @@ async function main() {
 }
 
 // Only run main() when executed directly (not when imported for testing)
-const isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"));
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isDirectRun) {
   main().catch((error) => {
     saveState({
