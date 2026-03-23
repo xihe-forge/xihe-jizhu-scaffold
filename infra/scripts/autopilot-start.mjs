@@ -1,7 +1,7 @@
 import { appendFileSync, createWriteStream, readFileSync, rmSync, readdirSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
-import { spawn, execSync } from "node:child_process";
+import { spawn, execSync, spawnSync } from "node:child_process";
 import process from "node:process";
 import path from "node:path";
 import {
@@ -249,10 +249,11 @@ function ensureCleanWorkingTree(taskId, taskName) {
     const status = execSync("git status --porcelain", { encoding: "utf8", timeout: 10000 }).trim();
     if (!status) return; // already clean
 
-    // Auto-stage and commit uncommitted changes
-    execSync("git add -A", { timeout: 10000 });
+    // Auto-stage and commit uncommitted changes (using spawnSync to avoid shell injection)
+    spawnSync("git", ["add", "-A"], { timeout: 10000, stdio: "pipe" });
     const msg = `chore: auto-commit after task ${taskId} — ${taskName}`;
-    execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, { encoding: "utf8", timeout: 30000 });
+    const commitResult = spawnSync("git", ["commit", "-m", msg], { encoding: "utf8", timeout: 30000, stdio: "pipe" });
+    if (commitResult.status !== 0) throw new Error(commitResult.stderr || "git commit failed");
     appendProgressEntry(`Auto-committed uncommitted changes after task ${taskId}`);
   } catch (err) {
     console.warn(`⚠ Auto-commit failed after task ${taskId}: ${err.message} — manual commit may be needed`);
@@ -271,7 +272,8 @@ function pushToRemote() {
     const branch = getCurrentBranch();
     if (branch === "unknown") return;
     console.log(`Pushing to ${remote}/${branch}...`);
-    execSync(`git push ${remote} ${branch}`, { encoding: "utf8", timeout: 60000, stdio: "pipe" });
+    const pushResult = spawnSync("git", ["push", remote, branch], { encoding: "utf8", timeout: 60000, stdio: "pipe" });
+    if (pushResult.status !== 0) throw new Error(pushResult.stderr || "git push failed");
     console.log(`✓ Pushed to ${remote}/${branch}`);
     appendProgressEntry(`Pushed to ${remote}/${branch}`);
   } catch (err) {
