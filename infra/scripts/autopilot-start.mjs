@@ -1791,10 +1791,11 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
   }
   clearInterval(heartbeat);
   logStream.end();
-  await new Promise((resolve) => {
+  await new Promise((resolve, reject) => {
     outputStream.on("finish", resolve);
+    outputStream.on("error", reject);
     outputStream.end();
-  });
+  }).catch(() => { /* ignore write errors — log file is best-effort */ });
 
   if (timedOut) {
     return {
@@ -1956,16 +1957,26 @@ async function main() {
   // Handle user decision after review pause or task needing context
   if (state.status === "awaiting_user_decision") {
     const pauseReason = state.needsContextDetails ? "needs_context" : "review_max_rounds";
-    if (pauseReason === "needs_context" && !acceptAsIs && !continueReview) {
-      console.log("");
-      console.log("Autopilot is paused — a task needs additional context.");
-      console.log(`Task: ${state.lastTaskId}`);
-      console.log(`Details: ${state.needsContextDetails}`);
-      console.log("");
-      console.log("Provide the needed context, then run: pnpm work");
-      console.log("Or skip with: pnpm work --accept-as-is");
-      console.log("");
-      process.exit(0);
+    if (pauseReason === "needs_context" && !acceptAsIs) {
+      if (continueReview) {
+        // --continue-review is not applicable to needs_context, treat as resume
+        console.log("Resuming after context was provided...");
+        saveState({ ...state, status: "running", needsContextDetails: undefined });
+      } else {
+        // No flags — check if the task is still in 'awaiting' state or user already provided context
+        // Since there's no way to programmatically detect context was provided,
+        // resume and let the task re-run (the agent will either succeed or NEEDS_CONTEXT again)
+        console.log("");
+        console.log("Autopilot is paused — a task needs additional context.");
+        console.log(`Task: ${state.lastTaskId}`);
+        console.log(`Details: ${state.needsContextDetails}`);
+        console.log("");
+        console.log("Options:");
+        console.log("  pnpm work --continue-review  → resume the task (after providing context)");
+        console.log("  pnpm work --accept-as-is     → skip this task and continue");
+        console.log("");
+        process.exit(0);
+      }
     }
     if (acceptAsIs) {
       if (pauseReason === "needs_context") {
