@@ -64,7 +64,7 @@ robust-ai-scaffold/
 ├── packages/           # Shared code and types
 ├── docs/               # Research, MRD, PRD, tech specs, design docs
 ├── dev/                # task.json, progress.txt, metrics.json, bug fixes, review logs
-├── test/               # Unit tests (159 tests across 14 test suites)
+├── test/               # Unit and integration tests
 ├── infra/scripts/      # Autopilot engine, intake flow, health checks
 │   └── lib/            # Shared utilities (ai-runner, autopilot-runner, project-setup, utils)
 ├── codex-bridge/       # PowerShell module for Codex CLI delegation

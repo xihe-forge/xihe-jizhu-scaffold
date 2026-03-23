@@ -30,6 +30,7 @@ The wizard now asks one simple runtime question:
 
 - `Claude Code CLI`
 - `Codex CLI`
+- `Gemini CLI`
 - `Custom command`
 
 ## 24/7 AI Mode
