@@ -12,6 +12,44 @@ This extends the base `review.md` recipe with tool-specific checks.
 | **impeccable** | `.ai/skills/impeccable` | Frontend code anti-pattern detection, design audit |
 | **vercel-web-design** | `.ai/skills/vercel-web-design` | Engineering UX quality gate (a11y, performance, standards) |
 
+## Stage 0: Scope Drift Check (Informational)
+
+Before reviewing code quality, compare the changed files against the task's stated scope.
+
+1. Read the task description and acceptance criteria from `dev/task.json` (current task)
+2. Run `git diff --name-only` to get the list of changed files
+3. Compare:
+   - **CLEAN**: All changed files are within the expected scope of the task
+   - **DRIFT_DETECTED**: Files were changed that are outside the task's scope (list them)
+   - **REQUIREMENTS_MISSING**: Some acceptance criteria have no corresponding file changes (list them)
+
+Report the drift status at the top of your review output. This is INFORMATIONAL — it does not block the review, but flags potential issues for the orchestrator.
+
+## Issue Classification & Fix-First Protocol
+
+The reviewer has WRITE permission. Classify every finding and act accordingly:
+
+### AUTO-FIX (fix directly, log what was fixed)
+| Category | Examples |
+|----------|----------|
+| Dead code | Unused imports, unreachable branches, commented-out code |
+| Stale comments | Comments that contradict the current code |
+| Obvious type errors | `\|\|` where `??` is needed, missing `await`, wrong nullish check |
+| N+1 queries | Database calls inside loops |
+| Missing error handling | Uncaught promise, missing try/catch at system boundary |
+| Formatting/lint | Inconsistent indentation, trailing whitespace (if no auto-formatter) |
+
+### REPORT (do NOT auto-fix, report for triage)
+| Category | Examples |
+|----------|----------|
+| Security design | Auth bypass, injection vectors, secrets exposure |
+| Race conditions | Concurrent state mutation, TOCTOU |
+| Architecture decisions | API surface changes, abstraction choices |
+| Business logic | Validation rules, pricing logic, permission models |
+| Performance trade-offs | Caching strategy, query optimization approach |
+
+**Rule**: For AUTO-FIX items, edit the file directly and list the change in your review output under "## Auto-Fixed Issues". For REPORT items, list them under "## Issues Requiring Triage" with severity (CRITICAL/HIGH/MEDIUM) and recommended action.
+
 ## Review Checklist
 
 ### Stage 1: Spec Compliance (base review.md)

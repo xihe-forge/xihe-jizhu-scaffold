@@ -20,7 +20,8 @@ import {
   topoSortSkills,
   recordTaskMetrics,
   checkGeminiPrerequisites,
-  buildGeminiDelegationBlock
+  buildGeminiDelegationBlock,
+  parseCompletionStatus
 } from "../../infra/scripts/autopilot-start.mjs";
 
 import {
@@ -1722,5 +1723,88 @@ describe("checkCircularDependencies", () => {
     assert.doesNotThrow(() => checkCircularDependencies(registry));
     const cycles = checkCircularDependencies(registry);
     assert.deepEqual(cycles, []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseCompletionStatus — completion status protocol parsing
+// ---------------------------------------------------------------------------
+
+describe("parseCompletionStatus", () => {
+  it("parses DONE from last lines", () => {
+    const output = "Some work done\nSTATUS: DONE\n";
+    const result = parseCompletionStatus(output);
+    assert.equal(result.status, "DONE");
+    assert.equal(result.raw, true);
+    assert.equal(result.details, "");
+  });
+
+  it("parses DONE_WITH_CONCERNS with details", () => {
+    const output = "Task finished\nSTATUS: DONE_WITH_CONCERNS — Missing unit tests for edge cases\n";
+    const result = parseCompletionStatus(output);
+    assert.equal(result.status, "DONE_WITH_CONCERNS");
+    assert.equal(result.details, "Missing unit tests for edge cases");
+    assert.equal(result.raw, true);
+  });
+
+  it("parses BLOCKED with reason", () => {
+    const output = "Tried to proceed\nSTATUS: BLOCKED — Dependency T003 not complete\n";
+    const result = parseCompletionStatus(output);
+    assert.equal(result.status, "BLOCKED");
+    assert.equal(result.details, "Dependency T003 not complete");
+    assert.equal(result.raw, true);
+  });
+
+  it("parses NEEDS_CONTEXT", () => {
+    const output = "Investigating\nSTATUS: NEEDS_CONTEXT — Missing API credentials\n";
+    const result = parseCompletionStatus(output);
+    assert.equal(result.status, "NEEDS_CONTEXT");
+    assert.equal(result.details, "Missing API credentials");
+    assert.equal(result.raw, true);
+  });
+
+  it("returns DONE with raw=false when no status found", () => {
+    const output = "All work completed successfully.\nNo status line here.";
+    const result = parseCompletionStatus(output);
+    assert.equal(result.status, "DONE");
+    assert.equal(result.raw, false);
+    assert.equal(result.details, "");
+  });
+
+  it("returns DONE with raw=false for null input", () => {
+    const result = parseCompletionStatus(null);
+    assert.equal(result.status, "DONE");
+    assert.equal(result.raw, false);
+  });
+
+  it("returns DONE with raw=false for empty string", () => {
+    const result = parseCompletionStatus("");
+    assert.equal(result.status, "DONE");
+    assert.equal(result.raw, false);
+  });
+
+  it("ignores status lines beyond the last 20 lines", () => {
+    // STATUS line is on line 1, but 25+ filler lines follow it
+    const fillerLines = Array.from({ length: 25 }, (_, i) => `filler line ${i}`).join("\n");
+    const output = `STATUS: BLOCKED — Should be ignored\n${fillerLines}`;
+    const result = parseCompletionStatus(output);
+    assert.equal(result.status, "DONE");
+    assert.equal(result.raw, false);
+  });
+
+  it("picks the last status line when multiple exist in the last 20 lines", () => {
+    const output = "work\nSTATUS: BLOCKED — First issue\nmore work\nSTATUS: DONE_WITH_CONCERNS — Resolved partially\n";
+    const result = parseCompletionStatus(output);
+    assert.equal(result.status, "DONE_WITH_CONCERNS");
+    assert.equal(result.details, "Resolved partially");
+    assert.equal(result.raw, true);
+  });
+
+  it("handles STATUS: DONE without details separator", () => {
+    const output = "line1\nSTATUS: DONE\nline3";
+    const result = parseCompletionStatus(output);
+    assert.equal(result.status, "DONE");
+    assert.equal(result.details, "");
+    assert.equal(result.raw, true);
   });
 });

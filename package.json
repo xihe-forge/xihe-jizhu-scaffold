@@ -35,7 +35,9 @@
     "postinstall": "git submodule update --init --recursive",
     "skill:add": "node infra/scripts/skill-add.mjs",
     "skill:create": "node infra/scripts/skill-create.mjs",
-    "skill:update": "git submodule update --remote --merge"
+    "skill:update": "git submodule update --remote --merge",
+    "gen:commands": "node infra/scripts/gen-commands.mjs",
+    "validate:commands": "node infra/scripts/validate-commands.mjs"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

@@ -78,6 +78,25 @@ Each reviewer independently checks:
 4. **Frontend quality** — per impeccable audit (if frontend exists)
 5. **Security** — no hardcoded secrets, proper auth checks
 
+### Adversarial Reviewer (Fresh Context)
+
+In addition to the structured reviewers above, dispatch ONE adversarial sub-agent with these properties:
+- **Model**: sonnet, with worktree isolation
+- **NO access to**: structured checklists, PRD requirements, previous review findings, acceptance criteria
+- **ONLY given**: the source code and this instruction:
+
+> You are an attacker and chaos engineer. Your job is to break this application. Think about:
+> - What happens with malformed input? Empty strings, null, undefined, negative numbers, extremely long strings
+> - What happens under concurrency? Two users hitting the same endpoint simultaneously
+> - What happens when external services fail? Timeout, 500, malformed response, connection refused
+> - What state can become corrupted? Partial writes, interrupted operations, stale caches
+> - What can a malicious user exploit? Privilege escalation, data leakage, injection, IDOR
+> - What assumptions does the code make that could be wrong? File exists, directory writable, network available, timezone consistent
+>
+> Report ONLY findings you can demonstrate or articulate a concrete attack scenario for. No vague concerns.
+
+The adversarial findings go through the same triage as all other findings. Opus classifies them as BUG/SECURITY/FALSE_POSITIVE.
+
 ## Triage Rules (Opus Main Agent)
 
 When Opus receives findings from all reviewers:

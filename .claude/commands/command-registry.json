@@ -1,0 +1,79 @@
+{
+  "commands": {
+    "review": {
+      "description": "Code + frontend review",
+      "skills": [
+        "impeccable/audit",
+        "impeccable/critique",
+        "vercel-web-design/web-design-guidelines"
+      ],
+      "recipes": [
+        "review-code.md",
+        "review-test-coverage.md",
+        "frontend-review-checklist.md",
+        "error-handling-and-logging.md"
+      ]
+    },
+    "design": {
+      "description": "Frontend UI design using impeccable skill module",
+      "skills": [
+        "impeccable/frontend-design",
+        "impeccable/teach-impeccable",
+        "impeccable/polish",
+        "impeccable/audit",
+        "impeccable/critique",
+        "impeccable/harden",
+        "impeccable/normalize",
+        "impeccable/optimize",
+        "impeccable/distill",
+        "impeccable/extract"
+      ],
+      "recipes": []
+    },
+    "ux-audit": {
+      "description": "Comprehensive UX audit combining aesthetic and engineering quality gates",
+      "skills": [
+        "impeccable/audit",
+        "vercel-web-design/web-design-guidelines"
+      ],
+      "recipes": []
+    },
+    "autopilot": {
+      "description": "Start the autopilot continuous delivery loop",
+      "skills": [],
+      "recipes": []
+    },
+    "intake": {
+      "description": "Run the project intake wizard",
+      "skills": [],
+      "recipes": []
+    },
+    "health": {
+      "description": "Run project health check",
+      "skills": [],
+      "recipes": []
+    },
+    "status": {
+      "description": "Show current project status at a glance",
+      "skills": [],
+      "recipes": []
+    },
+    "security": {
+      "description": "Comprehensive security audit (OWASP, dependencies, secrets)",
+      "skills": [],
+      "recipes": [
+        "security-audit.md"
+      ]
+    },
+    "deploy-check": {
+      "description": "Deployment readiness checks",
+      "skills": [],
+      "recipes": []
+    },
+    "cost": {
+      "description": "Cost and token usage report from autopilot metrics",
+      "skills": [],
+      "recipes": []
+    }
+  }
+}

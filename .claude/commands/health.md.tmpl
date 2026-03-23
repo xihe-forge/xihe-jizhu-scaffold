@@ -1,0 +1,17 @@
+{{PREAMBLE}}
+
+Run the project health check to verify environment and configuration.
+
+Execute the following command:
+
+```bash
+node infra/scripts/health-check.mjs
+```
+
+This checks:
+- Required tools installed (git, node, pnpm/npm)
+- `.planning/` directory structure exists
+- `dev/task.json` is valid
+- Runner (Claude CLI / Codex / Gemini) is available
+- Payment API keys (if payment module enabled)
+- Environment variables in `.env` / `.env.local`

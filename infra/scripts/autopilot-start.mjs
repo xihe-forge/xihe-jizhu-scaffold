@@ -178,7 +178,7 @@ function getReadyTasks() {
   for (const cycle of cycles) {
     const cycleWithoutDuplicate = cycle.slice(0, -1);
     const label = cycle.join(" → ");
-    console.warn(`WARNING: Circular dependency detected: ${label}`);
+    console.warn(`WARNING: Circular dependency detected: ${label} — check task dependencies in dev/task.json or reassign blocked tasks`);
     for (const id of cycleWithoutDuplicate) {
       cycleTaskIds.add(id);
     }
@@ -213,6 +213,28 @@ function getProgressTail() {
   const content = readText("dev/progress.txt", "progress.txt not found");
   const lines = content.split(/\r?\n/u).filter(Boolean);
   return lines.slice(-20).join("\n");
+}
+
+/**
+ * Parse the completion status protocol line from agent output.
+ * Agents should emit a STATUS: line as one of the last 20 lines of output.
+ * Recognized statuses: DONE, DONE_WITH_CONCERNS, BLOCKED, NEEDS_CONTEXT.
+ * Returns { status, details, raw } where raw=true means a STATUS line was found.
+ */
+function parseCompletionStatus(output) {
+  if (!output) return { status: "DONE", details: "", raw: false };
+  const lines = output.split("\n").slice(-20);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const match = lines[i].match(/^STATUS:\s*(DONE_WITH_CONCERNS|DONE|BLOCKED|NEEDS_CONTEXT)\s*(?:—\s*(.*))?$/u);
+    if (match) {
+      return { status: match[1], details: (match[2] ?? "").trim(), raw: true };
+    }
+  }
+  return { status: "DONE", details: "", raw: false };
+}
+
+function appendProgressEntry(text) {
+  appendFileSync("dev/progress.txt", `${text}\n`, "utf8");
 }
 
 function getTaskProgressSummary() {
@@ -1230,6 +1252,15 @@ function buildFinalReviewPrompt(config, round, previousFindings, { codexAvailabl
   }
 
   parts.push(
+    "### Adversarial Review (Fresh Context)",
+    "Launch one additional sub-Agent (sonnet, worktree isolation) with NO access to checklists, PRD, or previous findings.",
+    "Give it ONLY the source code and this instruction:",
+    "\"You are an attacker and chaos engineer. Break this application. Focus on: malformed input, concurrency, external service failures, state corruption, privilege escalation, wrong assumptions. Report only findings with concrete attack scenarios.\"",
+    "Include adversarial findings in the triage alongside structured review findings.",
+    ""
+  );
+
+  parts.push(
     "## Step 2: Collect & Deduplicate",
     "",
     "After ALL reviewers complete:",
@@ -1893,13 +1924,13 @@ async function main() {
   const runner = resolveRunnerProfile(config);
 
   if (runner.mode === "claude" && process.env.CLAUDECODE) {
-    console.error("Autopilot must be started outside an existing Claude Code session.");
+    console.error("Autopilot must be started outside an existing Claude Code session. — close the current Claude Code session and run `pnpm work` from a plain terminal");
     process.exit(1);
   }
 
   const probe = probeRunner(config);
   if (!probe.passed) {
-    console.error(`Configured runner is not ready: ${renderRunnerSummary(config)}`);
+    console.error(`Configured runner is not ready: ${renderRunnerSummary(config)} — run \`pnpm autopilot:configure\` to set up a working AI runtime`);
     if (probe.validationIssues.length > 0) {
       for (const issue of probe.validationIssues) {
         console.error(`- ${issue}`);
@@ -1987,7 +2018,7 @@ async function main() {
     if (!codexCheck.available) {
       const codexTasks = readyTasks.filter((t) => t.assignee === "codex");
       if (codexTasks.length > 0) {
-        console.warn(`[autopilot] Codex prerequisites missing — skipping ${codexTasks.length} codex-assigned task(s):`);
+        console.warn(`[autopilot] Codex prerequisites missing — skipping ${codexTasks.length} codex-assigned task(s) — install codex CLI or reassign tasks to sonnet in dev/task.json`);
         for (const issue of codexCheck.issues) console.warn(`  - ${issue}`);
         for (const ct of codexTasks) console.warn(`  - Skipped: ${ct.id} (${ct.name})`);
         readyTasks = readyTasks.filter((t) => t.assignee !== "codex");
@@ -2000,7 +2031,7 @@ async function main() {
     if (!geminiCheck.available) {
       const geminiTasks = readyTasks.filter((t) => t.assignee === "gemini");
       if (geminiTasks.length > 0) {
-        console.warn(`[autopilot] Gemini prerequisites missing — skipping ${geminiTasks.length} gemini-assigned task(s):`);
+        console.warn(`[autopilot] Gemini prerequisites missing — skipping ${geminiTasks.length} gemini-assigned task(s) — install gemini CLI or reassign tasks to sonnet in dev/task.json`);
         for (const issue of geminiCheck.issues) console.warn(`  - ${issue}`);
         for (const gt of geminiTasks) console.warn(`  - Skipped: ${gt.id} (${gt.name})`);
         readyTasks = readyTasks.filter((t) => t.assignee !== "gemini");
@@ -2010,7 +2041,7 @@ async function main() {
     if (readyTasks.length === 0) {
       const originalReady = getReadyTasks();
       if (originalReady.length > 0) {
-        console.warn(`[autopilot] All ready tasks require unavailable CLI tools. Waiting for next round.`);
+        console.warn(`[autopilot] All ready tasks require unavailable CLI tools. Waiting for next round. — install the required CLI tool or reassign the task to an available runner`);
         if (runOnce) break;
         await waitWithCountdown(1);
         continue;
@@ -2105,6 +2136,31 @@ async function main() {
 
     // Notify on task completion or failure (non-blocking)
     if (result.exitCode === 0 && task) {
+      // Parse agent completion status protocol
+      const completionStatus = parseCompletionStatus(result.output ?? "");
+      if (!completionStatus.raw) {
+        console.warn("⚠ Agent did not emit completion status — treating as DONE");
+      }
+      if (completionStatus.status === "BLOCKED") {
+        console.error(`Task blocked: ${completionStatus.details} — check task dependencies in dev/task.json or reassign blocked tasks`);
+        // mark task as blocked instead of complete — skip the normal completion flow
+        saveState({
+          ...loadState(),
+          status: "waiting_retry",
+          lastTaskId: task.id,
+          lastFailureCategory: "blocked",
+          lastFailureHint: completionStatus.details
+        });
+        if (runOnce) break;
+        continue;
+      }
+      if (completionStatus.status === "NEEDS_CONTEXT") {
+        console.warn(`Task needs context: ${completionStatus.details} — autopilot pausing for user input`);
+      }
+      if (completionStatus.status === "DONE_WITH_CONCERNS") {
+        appendProgressEntry(`Task ${task.id} completed with concerns: ${completionStatus.details}`);
+      }
+
       notify("task_completed", {
         task_id: task.id,
         task_name: task.name,
@@ -2138,7 +2194,7 @@ async function main() {
           taskRetryMap.set(taskId, nextTaskRetries);
         }
         console.error(
-          `Task ${taskId ?? "(idle)"} timed out and exceeded max task retries (${maxTaskRetries}). Marking as failed and moving on.`
+          `Task ${taskId ?? "(idle)"} timed out and exceeded max task retries (${maxTaskRetries}). Marking as failed and moving on. — consider breaking the task into smaller subtasks in dev/task.json or increasing timeout in .autopilot/config.json`
         );
         notify("task_failed", {
           task_id: taskId ?? "idle",
@@ -2211,17 +2267,26 @@ async function main() {
               const hasUnresolved = unresolvedContent.trim().length > 0;
 
               if (hasUnresolved) {
+                // Gather context for standardized question format
+                let branchName = "unknown";
+                try { branchName = execSync("git rev-parse --abbrev-ref HEAD", { timeout: 5000, stdio: "pipe" }).toString().trim(); } catch { /* ignore */ }
+                const projectName = planConfig?.project_name ?? path.basename(rootDir);
+                // Count unresolved issues (rough: count lines starting with - or *)
+                const unresolvedLines = unresolvedContent.split("\n").filter(l => /^\s*[-*]\s/.test(l));
+                const unresolvedCount = unresolvedLines.length || "unknown number of";
+                const hasCritical = /\b(BUG|SECURITY)\b/.test(unresolvedContent);
+
                 console.log("");
                 console.log("╔══════════════════════════════════════════════════════════╗");
                 console.log("║  REVIEW PAUSED — Awaiting User Decision                 ║");
                 console.log("╠══════════════════════════════════════════════════════════╣");
-                console.log(`║  Completed ${reviewRound} review rounds (max reached).`);
-                console.log("║  Unresolved issues remain.");
+                console.log(`║  Context: ${branchName} / ${projectName} / final review round ${reviewRound}`);
+                console.log(`║  Question: ${unresolvedCount} unresolved issues remain after ${reviewRound} review rounds. How should we proceed?`);
+                console.log(`║  Recommendation: ${hasCritical ? "Continue review — issues include BUG/SECURITY severity (confidence: 75%)" : "Accept as-is — no critical severity issues remain (confidence: 70%)"}`);
+                console.log("║  Options:");
+                console.log("║    1. pnpm work --continue-review — extend with another batch of review rounds (~15-30 min)");
+                console.log("║    2. pnpm work --accept-as-is — accept current state and mark review complete (~0 min)");
                 console.log("║  Details: dev/review/FINAL-REVIEW-UNRESOLVED.md");
-                console.log("║                                                          ║");
-                console.log("║  Options:                                                ║");
-                console.log("║    pnpm work --continue-review  → extend review rounds   ║");
-                console.log("║    pnpm work --accept-as-is     → accept and finish       ║");
                 console.log("╚══════════════════════════════════════════════════════════╝");
                 console.log("");
                 saveState({ ...loadState(), status: "awaiting_user_decision" });
@@ -2372,7 +2437,7 @@ async function main() {
         }
 
         if (!config.behavior.allowTaskGenerationWhenIdle) {
-          console.log(`No ready tasks. ${finalSummary.done}/${finalSummary.total} done. Remaining tasks may be blocked or all complete.`);
+          console.log(`No ready tasks. ${finalSummary.done}/${finalSummary.total} done. Remaining tasks may be blocked or all complete. — check task dependencies in dev/task.json or reassign blocked tasks`);
           break;
         }
 
@@ -2397,7 +2462,7 @@ async function main() {
         error_message: `Max retries reached (${retryCount})`,
         last_hint: result.failureHint ?? ""
       }).catch?.(() => {});
-      console.error(`Autopilot stopped after reaching max retries (${retryCount}).`);
+      console.error(`Autopilot stopped after reaching max retries (${retryCount}). — check .autopilot/logs/autopilot.log for failure details and resolve the underlying issue before restarting`);
       process.exit(1);
     }
 
@@ -2454,4 +2519,4 @@ if (isDirectRun) {
 }
 
 // Export for testing
-export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds, loadSkillInstructions, getSkillExecutionOrder, topoSortSkills, recordTaskMetrics, checkGeminiPrerequisites, buildGeminiDelegationBlock };
+export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds, loadSkillInstructions, getSkillExecutionOrder, topoSortSkills, recordTaskMetrics, checkGeminiPrerequisites, buildGeminiDelegationBlock, parseCompletionStatus };

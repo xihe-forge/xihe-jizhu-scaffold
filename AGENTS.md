@@ -123,6 +123,26 @@ Agent(model: 'sonnet', isolation: 'worktree', description: 'implement user API',
 6. **Reviews go to `dev/review/`** with outcomes and action items
 7. **Docs stay aligned** — if implementation changes behavior, update the relevant doc
 
+### Fix-First Review Protocol
+
+Review agents have WRITE permission for mechanical fixes. Issues are classified as:
+
+| Classification | Action | Examples |
+|---------------|--------|----------|
+| **AUTO-FIX** | Fix directly, log what was fixed | Dead code, stale comments, obvious type errors, missing await, N+1 queries |
+| **REPORT** | Report for Opus triage | Security design, race conditions, architecture decisions, business logic |
+
+This eliminates the report→triage→fix round-trip for mechanical issues, reducing review cycles.
+
+### Scope Drift Detection
+
+Before code review, the reviewer compares changed files against the task's acceptance criteria:
+- **CLEAN**: Changes match stated scope
+- **DRIFT_DETECTED**: Files changed outside task scope (informational, not blocking)
+- **REQUIREMENTS_MISSING**: Acceptance criteria not addressed by any file change
+
+This is an informational check that flags potential scope creep early.
+
 ### Deviation Handling Rules
 
 During execution, agents will encounter unplanned situations. Handle them by severity:
@@ -168,6 +188,20 @@ All projects built on this scaffold MUST follow `.ai/recipes/error-handling-and-
 2. **Structured logging**: Every request logged with userId, IP, timestamp, method, path, statusCode, duration.
 3. **Error reporting**: Frontend errors captured by error boundary and reported to `/api/log/error`.
 4. **Error correlation**: Every error gets a unique `errorId` — user can report it, developer can find it in logs.
+
+### Error Message Convention
+
+All error messages in the scaffold follow the pattern:
+```
+[what went wrong] — [actionable next step]
+```
+
+Examples:
+- `File not found: dev/task.json — run pnpm kickoff to initialize the project`
+- `Lock acquisition failed — another process may hold the lock. Wait and retry, or delete the .lock file if the process has crashed`
+- `Runner not ready — run pnpm autopilot:configure to set up a working AI runtime`
+
+Errors must tell the agent (or human) what to do next, not just report the failure.
 
 ### Stage-Based Review Gates
 
@@ -266,6 +300,10 @@ The higher tier wins when task count and file count fall in different tiers.
 
 This ensures no issues are swept under the rug — the human always has final say.
 
+### Adversarial Reviewer
+
+During final review, an additional fresh-context agent reviews the code with an attacker/chaos-engineer mindset. This agent has NO access to structured checklists or previous findings — it reviews from zero context to avoid confirmation bias. Findings go through the standard Opus triage process.
+
 ### External Skill Modules
 
 The scaffold integrates independent, pluggable skill modules for specialized tasks.
@@ -328,6 +366,37 @@ Templates pre-configure review gates, discipline settings, optional modules, and
 - Record decisions in `.planning/STATE.md` (not just in commit messages)
 - Keep docs and implementation aligned
 - Prefer explicit over implicit — if something is unclear, record the assumption
+
+### Completion Status Protocol
+
+Every worker agent MUST end its output with exactly one status line in this format:
+
+```
+STATUS: DONE
+STATUS: DONE_WITH_CONCERNS — [list concerns]
+STATUS: BLOCKED — [reason]
+STATUS: NEEDS_CONTEXT — [what information is needed]
+```
+
+- `DONE`: Task completed successfully, all acceptance criteria met
+- `DONE_WITH_CONCERNS`: Task completed but the orchestrator should review specific concerns
+- `BLOCKED`: Cannot proceed without external action (missing dependency, broken tool, etc.)
+- `NEEDS_CONTEXT`: Missing information that only a human or another agent can provide
+
+The autopilot parses this from agent output to determine next action. If no status line is found, the output is treated as DONE with a warning logged.
+
+### User Question Format
+
+When the autopilot must ask the user a question, use this structure:
+
+**Context**: [branch] / [project] / [current phase]
+**Question**: [plain language, one sentence]
+**Recommendation**: [what the agent recommends] (confidence: X%)
+**Options**:
+1. [option] — ~[time estimate]
+2. [option] — ~[time estimate]
+
+This ensures consistent, scannable questions across all autopilot interactions.
 
 ### Task Status Lifecycle
 

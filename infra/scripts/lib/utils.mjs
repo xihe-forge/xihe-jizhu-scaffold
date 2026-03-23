@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, openSync, closeSync, unlinkSync, readFileSync, writeFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, closeSync, unlinkSync, readFileSync, writeFileSync, renameSync, statSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { spawnSync } from "node:child_process";
@@ -85,7 +85,7 @@ function acquireLock(absolutePath) {
       return lockPath;
     } catch (err) {
       if (err.code !== "EEXIST" || attempt === LOCK_RETRY_COUNT) {
-        throw new Error(`Could not acquire lock for ${absolutePath} after ${attempt} attempts: ${err.message}`);
+        throw new Error(`Could not acquire lock for ${absolutePath} after ${attempt} attempts: ${err.message} — another process may be writing to this file. Wait and retry, or delete the .lock file if the other process has crashed.`);
       }
       // Synchronous sleep via a busy-wait is avoided; we use a short Atomics wait instead.
       const sharedBuffer = new SharedArrayBuffer(4);
@@ -135,30 +135,36 @@ export function pathExists(relativePath) {
 export function readJson(relativePath, fallback = null) {
   try {
     return JSON.parse(readFileSync(resolvePath(relativePath), "utf8"));
-  } catch {
-    return fallback;
+  } catch (err) {
+    if (fallback !== null) return fallback;
+    throw new Error(`Failed to read JSON from ${relativePath}: ${err.message} — run pnpm kickoff to initialize the project first`);
   }
 }
 
 export function writeJson(relativePath, data) {
   const absolutePath = resolvePath(relativePath);
   withFileLock(absolutePath, () => {
-    writeFileSync(absolutePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+    const tmpPath = `${absolutePath}.tmp.${process.pid}`;
+    writeFileSync(tmpPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+    renameSync(tmpPath, absolutePath);
   });
 }
 
 export function readText(relativePath, fallback = "") {
   try {
     return readFileSync(resolvePath(relativePath), "utf8");
-  } catch {
-    return fallback;
+  } catch (err) {
+    if (fallback !== "") return fallback;
+    throw new Error(`Failed to read text from ${relativePath}: ${err.message} — run pnpm kickoff to initialize the project first`);
   }
 }
 
 export function writeText(relativePath, content) {
   const absolutePath = resolvePath(relativePath);
   withFileLock(absolutePath, () => {
-    writeFileSync(absolutePath, content, "utf8");
+    const tmpPath = `${absolutePath}.tmp.${process.pid}`;
+    writeFileSync(tmpPath, content, "utf8");
+    renameSync(tmpPath, absolutePath);
   });
 }
 
