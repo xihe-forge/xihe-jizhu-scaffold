@@ -183,8 +183,9 @@ The scaffold's core architecture (autopilot, intake, review pipeline) is self-co
 |--------|------|--------|
 | **impeccable** | Frontend design generation & refinement, anti-AI-slop aesthetics (9 skills + 7 reference docs) | [impeccable](https://github.com/pbakaus/impeccable) |
 | **vercel-web-design** | Engineering UX quality gate (accessibility, performance, standards) | [vercel-labs](https://github.com/vercel-labs/agent-skills) |
+| **xihe-search-forge** | SEO/GEO/AEO audit, AI search engine optimization, structured data validation | [xihe-forge](https://github.com/xihe-forge/xihe-search-forge) |
 
-These two modules are **complementary**: impeccable handles visual aesthetics (anti-AI-slop), Vercel handles engineering standards (a11y, performance, UX). Both are used together during reviews and final iteration.
+These three modules are **complementary**: impeccable handles visual aesthetics (anti-AI-slop), Vercel handles engineering standards (a11y, performance, UX), and xihe-search-forge handles search discoverability (SEO/GEO/AEO). All are used together during reviews and final iteration.
 
 Skill registry: `.ai/skills/skill-registry.json`
 - Skills declare `depends_on` edges (e.g., `polish` depends on `audit`)
@@ -238,6 +239,8 @@ Testing Complete ------> review-test-coverage.md   [BLOCKING]  (100% PRD coverag
 Marketing -------------> review-marketing.md       [Advisory]
                               |
 SEO/AEO (web deploy) -> review-seo-aeo.md         [Advisory]
+                              |
+All Tasks Complete ----> review-final-iteration.md [BLOCKING]  (multi-AI convergence)
 ```
 
 Each gate specifies:

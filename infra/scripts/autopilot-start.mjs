@@ -1791,7 +1791,10 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
   }
   clearInterval(heartbeat);
   logStream.end();
-  outputStream.end();
+  await new Promise((resolve) => {
+    outputStream.on("finish", resolve);
+    outputStream.end();
+  });
 
   if (timedOut) {
     return {
@@ -1950,12 +1953,36 @@ async function main() {
 
   const state = loadState();
 
-  // Handle user decision after review pause
+  // Handle user decision after review pause or task needing context
   if (state.status === "awaiting_user_decision") {
-    if (acceptAsIs) {
-      console.log("User accepted current state as-is. Marking review as done.");
-      saveState({ ...state, status: "final_review_done" });
+    const pauseReason = state.needsContextDetails ? "needs_context" : "review_max_rounds";
+    if (pauseReason === "needs_context" && !acceptAsIs && !continueReview) {
+      console.log("");
+      console.log("Autopilot is paused — a task needs additional context.");
+      console.log(`Task: ${state.lastTaskId}`);
+      console.log(`Details: ${state.needsContextDetails}`);
+      console.log("");
+      console.log("Provide the needed context, then run: pnpm work");
+      console.log("Or skip with: pnpm work --accept-as-is");
+      console.log("");
       process.exit(0);
+    }
+    if (acceptAsIs) {
+      if (pauseReason === "needs_context") {
+        console.log("Skipping blocked task and continuing.");
+        // Mark the task as skipped
+        const allTasks = readJson("dev/task.json", { tasks: [] });
+        const skippedTask = (allTasks.tasks ?? []).find((t) => t.id === state.lastTaskId);
+        if (skippedTask) {
+          skippedTask.status = "skipped";
+          writeJson("dev/task.json", allTasks);
+        }
+        saveState({ ...state, status: "running", needsContextDetails: undefined });
+      } else {
+        console.log("User accepted current state as-is. Marking review as done.");
+        saveState({ ...state, status: "final_review_done" });
+        process.exit(0);
+      }
     } else if (continueReview) {
       // Grant additional rounds (same as computed max, effectively doubles the budget)
       const planConfig = readJson(".planning/config.json", {});
@@ -1985,7 +2012,7 @@ async function main() {
     }
   }
 
-  saveState({ ...state, status: "starting" });
+  saveState({ ...loadState(), status: "starting" });
 
   process.on("SIGINT", () => {
     notify("stopped", { reason: "SIGINT (user interrupt)" }).catch?.(() => {});
