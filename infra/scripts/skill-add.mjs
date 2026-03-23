@@ -27,7 +27,7 @@ function parseGitHubUrl(url) {
     return { org: httpsMatch[1], repo: httpsMatch[2], url };
   }
 
-  const sshMatch = url.match(/github\.com:([^/]+)\/([^/.]+?)(?:\.git)?$/);
+  const sshMatch = url.match(/^git@github\.com:([^/]+)\/([^/.]+?)(?:\.git)?$/);
   if (sshMatch) {
     return { org: sshMatch[1], repo: sshMatch[2], url };
   }
