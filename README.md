@@ -10,7 +10,7 @@ You describe a project idea. The scaffold:
 
 1. **Interviews** you to clarify scope, requirements, and priorities
 2. **Generates** a structured project plan (tasks, milestones, acceptance criteria)
-3. **Executes autonomously** using a multi-agent model (Opus orchestrates, Sonnet/Codex implement)
+3. **Executes autonomously** using a multi-agent model (Opus orchestrates, Sonnet/Codex/Gemini implement)
 4. **Survives interruptions** -- quota exhaustion, rate limits, process crashes -- and resumes where it left off
 
 The result is a self-governing development loop that runs until the work is done.
@@ -59,12 +59,12 @@ robust-ai-scaffold/
 │   ├── recipes/        # Agent playbooks (implement, review, diagnose, adopt, security-audit, etc.)
 │   ├── skills/         # External skill modules (impeccable, vercel-web-design)
 │   └── templates/      # Project type templates (saas, landing-page, api-only, fullstack)
-├── .claude/commands/   # CLI slash commands (/intake, /autopilot, /review, etc.)
+├── .claude/commands/   # CLI slash commands, templates (*.md.tmpl), command-registry.json
 ├── apps/               # Application entrypoints (web, api)
 ├── packages/           # Shared code and types
 ├── docs/               # Research, MRD, PRD, tech specs, design docs
 ├── dev/                # task.json, progress.txt, metrics.json, bug fixes, review logs
-├── test/               # Unit tests (109 tests across 14 test suites)
+├── test/               # Unit tests (159 tests across 14 test suites)
 ├── infra/scripts/      # Autopilot engine, intake flow, health checks
 │   └── lib/            # Shared utilities (ai-runner, autopilot-runner, project-setup, utils)
 ├── codex-bridge/       # PowerShell module for Codex CLI delegation
@@ -156,6 +156,8 @@ pnpm build               # Build all packages (turbo)
 pnpm typecheck           # Type-check all packages (turbo)
 pnpm lint                # Lint all packages (turbo)
 pnpm test                # Run all tests (turbo)
+pnpm gen:commands        # Regenerate .claude/commands/*.md from templates
+pnpm validate:commands   # Validate command registry (skill paths, recipe paths)
 ```
 
 ### CLI Slash Commands
@@ -198,7 +200,8 @@ Skill registry: `.ai/skills/skill-registry.json`
 |-------|----------------|
 | `implement_frontend` | `impeccable/frontend-design` |
 | `review_frontend` | `impeccable/critique` -> `vercel-web-design/web-design-guidelines` -> `impeccable/audit` -> `impeccable/normalize` -> `impeccable/polish` |
-| `final_review` | `impeccable/audit` -> `vercel-web-design/web-design-guidelines` |
+| `review_seo` | `xihe-search-forge/seo-audit` -> `xihe-search-forge/aeo-audit` -> `xihe-search-forge/aeo-monitor` -> `xihe-search-forge/seo-report` |
+| `final_review` | `impeccable/audit` -> `vercel-web-design/web-design-guidelines` -> `xihe-search-forge/seo-audit` -> `xihe-search-forge/aeo-audit` -> `xihe-search-forge/aeo-monitor` -> `xihe-search-forge/seo-report` |
 
 ## Project Templates
 
@@ -256,6 +259,25 @@ Each gate specifies:
 - `.ai/recipes/error-handling-and-logging.md` -- error safety and structured logging standards. Mandatory for all projects.
 
 **PRD-to-Test coverage rule**: Tests must cover the entire PRD. The test coverage review builds a coverage matrix (every PRD requirement -> corresponding tests) and blocks on any gaps.
+
+### Fix-First Review Protocol
+
+Review findings are classified into two categories:
+
+| Classification | Action | Examples |
+|----------------|--------|----------|
+| **AUTO-FIX** | Agent fixes immediately without asking | Missing null check, broken import, test gap, typo |
+| **REPORT** | Logged for human decision | Architecture change, scope expansion, ambiguous requirement |
+
+Additional review behaviors:
+
+- **Scope Drift Detection (Stage 0)**: Before any review gate runs, the autopilot checks whether the current work has drifted from the task's acceptance criteria. Drift is flagged and corrected before review proceeds.
+- **Adversarial Sub-Agent**: During final review, an adversarial sub-agent attempts to break the deliverable by testing edge cases, invalid inputs, and undocumented assumptions. Findings feed into the normal triage pipeline.
+- **Completion Status Protocol**: Every review round ends with one of four statuses:
+  - `DONE` -- all checks pass, no issues
+  - `DONE_WITH_CONCERNS` -- passes but has advisory findings worth noting
+  - `BLOCKED` -- blocking issue found, must fix before proceeding
+  - `NEEDS_CONTEXT` -- reviewer cannot determine correctness without additional information
 
 ## Final Iteration Review (Multi-AI Convergence)
 
