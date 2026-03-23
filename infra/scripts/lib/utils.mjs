@@ -366,7 +366,7 @@ export async function promptChoice(rl, label, choices, defaultIndex = 0) {
 
 export function replaceMarkdownSection(markdown, heading, body) {
   const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`(## ${escapedHeading}\\n\\n)([\\s\\S]*?)(?=\\n## |$)`, "m");
+  const pattern = new RegExp(`(## ${escapedHeading}\\n\\n)([\\s\\S]*?)(?=\\n## |$)`);
   const replacement = `$1${body.trim()}\n`;
   if (pattern.test(markdown)) {
     return markdown.replace(pattern, replacement);

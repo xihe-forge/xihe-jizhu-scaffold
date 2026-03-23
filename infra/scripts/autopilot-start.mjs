@@ -1200,6 +1200,10 @@ function buildFinalReviewPrompt(config, round, previousFindings, { codexAvailabl
   });
   const docReviewers = finalReviewConfig.parallel_reviewers?.docs ?? ["opus"];
   const codeReviewers = finalReviewConfig.parallel_reviewers?.code ?? ["sonnet"];
+  // Check which optional skill files actually exist (they live in git submodules)
+  const hasFrontendDesignSkill = pathExists(".ai/skills/impeccable/frontend-design.md");
+  const hasAuditSkill = pathExists(".ai/skills/impeccable/audit.md");
+  const hasWebDesignSkill = pathExists(".ai/skills/vercel-web-design/web-design-guidelines.md");
   // Use pre-computed prereq results if provided, otherwise compute once here
   const _codexAvailable = codexAvailable ?? checkCodexPrerequisites().available;
   const _geminiAvailable = geminiAvailable ?? checkGeminiPrerequisites().available;
@@ -1256,7 +1260,7 @@ function buildFinalReviewPrompt(config, round, previousFindings, { codexAvailabl
         "### Codex — Document Review",
         "Delegate to Codex CLI via codex-bridge (see AGENTS.md Codex Delegation Protocol).",
         "Codex reviews: MRD completeness, PRD quality, tech spec accuracy, design doc alignment.",
-        "For frontend design docs: cross-check against .ai/skills/impeccable/frontend-design.md standards.",
+        ...(hasFrontendDesignSkill ? ["For frontend design docs: cross-check against .ai/skills/impeccable/frontend-design.md standards."] : []),
         "Output findings as a structured list in the handoff result.",
         ""
       );
@@ -1265,7 +1269,7 @@ function buildFinalReviewPrompt(config, round, previousFindings, { codexAvailabl
         "### Gemini — Document Review",
         "Delegate to Gemini CLI via gemini-bridge (see AGENTS.md Gemini Delegation Protocol).",
         "Gemini reviews: MRD completeness, PRD quality, tech spec accuracy, design doc alignment.",
-        "For frontend design docs: cross-check against .ai/skills/impeccable/frontend-design.md standards.",
+        ...(hasFrontendDesignSkill ? ["For frontend design docs: cross-check against .ai/skills/impeccable/frontend-design.md standards."] : []),
         "Output findings as a structured list in the handoff result.",
         ""
       );
@@ -1276,7 +1280,7 @@ function buildFinalReviewPrompt(config, round, previousFindings, { codexAvailabl
         `Launch a sub-Agent with \`model: '${model}'\` (no worktree needed for read-only review).`,
         "Review: MRD completeness, PRD quality, tech spec accuracy, design doc alignment.",
         "Apply review-mrd-prd.md and review-tech-design.md recipes.",
-        "For frontend design docs: cross-check against .ai/skills/impeccable/frontend-design.md standards.",
+        ...(hasFrontendDesignSkill ? ["For frontend design docs: cross-check against .ai/skills/impeccable/frontend-design.md standards."] : []),
         "Return a structured findings list.",
         ""
       );
@@ -1290,7 +1294,7 @@ function buildFinalReviewPrompt(config, round, previousFindings, { codexAvailabl
         "### Codex — Code & Test Review",
         "Delegate to Codex CLI via codex-bridge.",
         "Codex reviews: code quality, test coverage (build PRD-to-test matrix), TDD compliance, security.",
-        "For frontend: apply .ai/skills/impeccable/audit.md + .ai/skills/vercel-web-design/web-design-guidelines.md.",
+        ...(hasAuditSkill || hasWebDesignSkill ? [`For frontend: apply${hasAuditSkill ? " .ai/skills/impeccable/audit.md" : ""}${hasAuditSkill && hasWebDesignSkill ? " +" : ""}${hasWebDesignSkill ? " .ai/skills/vercel-web-design/web-design-guidelines.md" : ""}.`] : []),
         "Output findings as a structured list.",
         ""
       );
@@ -1299,7 +1303,7 @@ function buildFinalReviewPrompt(config, round, previousFindings, { codexAvailabl
         "### Gemini — Code & Test Review",
         "Delegate to Gemini CLI via gemini-bridge.",
         "Gemini reviews: code quality, test coverage (build PRD-to-test matrix), TDD compliance, security.",
-        "For frontend: apply .ai/skills/impeccable/audit.md + .ai/skills/vercel-web-design/web-design-guidelines.md.",
+        ...(hasAuditSkill || hasWebDesignSkill ? [`For frontend: apply${hasAuditSkill ? " .ai/skills/impeccable/audit.md" : ""}${hasAuditSkill && hasWebDesignSkill ? " +" : ""}${hasWebDesignSkill ? " .ai/skills/vercel-web-design/web-design-guidelines.md" : ""}.`] : []),
         "Output findings as a structured list.",
         ""
       );
@@ -1310,8 +1314,8 @@ function buildFinalReviewPrompt(config, round, previousFindings, { codexAvailabl
         `Launch a sub-Agent with \`model: '${model}', isolation: 'worktree'\`.`,
         "Review: code quality (review-code.md), test coverage (review-test-coverage.md),",
         "TDD compliance, security.",
-        "For frontend code: read and apply .ai/skills/impeccable/audit.md (aesthetic + anti-AI-slop audit),",
-        "then .ai/skills/vercel-web-design/web-design-guidelines.md (engineering QA: a11y, performance, UX).",
+        ...(hasAuditSkill ? ["For frontend code: read and apply .ai/skills/impeccable/audit.md (aesthetic + anti-AI-slop audit),"] : []),
+        ...(hasWebDesignSkill ? ["then .ai/skills/vercel-web-design/web-design-guidelines.md (engineering QA: a11y, performance, UX)."] : []),
         "Build a PRD-to-test coverage matrix — every PRD requirement MUST have a test.",
         "Return a structured findings list.",
         ""
@@ -2468,9 +2472,14 @@ async function main() {
             const previousFindingsPath = `dev/review/FINAL-REVIEW-ROUND-${reviewRound - 1}.md`;
             const previousFindings = reviewRound > 1 ? readText(previousFindingsPath, null) : null;
 
+            // For final review, check CLI availability independently of task assignment
+            // (all tasks are DONE so hasCodexTasks/hasGeminiTasks are always false)
+            const finalCodexCheck = checkCodexPrerequisites();
+            const finalGeminiCheck = checkGeminiPrerequisites();
+
             const reviewPrompt = buildFinalReviewPrompt(config, reviewRound, previousFindings, {
-              codexAvailable: codexCheck.available,
-              geminiAvailable: geminiCheck.available
+              codexAvailable: finalCodexCheck.available,
+              geminiAvailable: finalGeminiCheck.available
             });
             const reviewModel = config.models.planning;
 

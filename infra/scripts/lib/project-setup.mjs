@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { readJson, readText, replaceMarkdownSection, resolvePath, slugify, writeJson, writeText } from "./utils.mjs";
+import { existsSync, writeFileSync } from "node:fs";
+import { readJson, readText, replaceMarkdownSection, resolvePath, slugify, writeJson, writeText, ensureDir } from "./utils.mjs";
 
 export function detectCurrentRootName() {
   return readJson("package.json", {})?.name ?? "robust-ai-scaffold";
@@ -265,6 +265,11 @@ export function writeProjectPlan(plan) {
 export function appendProgressEntry(entry, maxRetries = 3) {
   const normalizedEntry = String(entry ?? "").replace(/^\[\d{4}-\d{2}-\d{2}\]\s*/u, "").trim();
   const line = `[${new Date().toISOString().slice(0, 10)}] ${normalizedEntry}`;
+
+  if (!existsSync(resolvePath("dev/progress.txt"))) {
+    ensureDir("dev");
+    writeFileSync(resolvePath("dev/progress.txt"), "", "utf8");
+  }
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {

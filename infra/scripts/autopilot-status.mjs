@@ -75,14 +75,14 @@ function progressBar(done, total) {
 
 /**
  * Determine quota health from autopilot state.
- * If status is "quota_wait", try to parse reset time from lastFailureHint.
+ * If status is "waiting_quota", try to parse reset time from lastFailureHint.
  */
 function quotaLine(state) {
   if (!state) return dim("Quota: unknown");
 
   const status = state.status ?? "";
 
-  if (status === "quota_wait") {
+  if (status === "waiting_quota") {
     const hint = state.lastFailureHint ?? "";
     // look for "resets HH:MM am/pm" pattern
     const match = hint.match(/resets?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/iu);
@@ -115,7 +115,7 @@ function quotaLine(state) {
 function colorStatus(status) {
   if (!status) return dim("unknown");
   if (status === "running" || status === "done" || status === "success") return green(status);
-  if (status === "quota_wait" || status === "in_progress" || status === "waiting") return yellow(status);
+  if (status === "waiting_quota" || status === "in_progress" || status === "waiting") return yellow(status);
   if (status === "error" || status === "failed") return red(status);
   return cyan(status);
 }

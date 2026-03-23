@@ -22,7 +22,7 @@ const SKILLS_DIR = ".ai/skills";
 function parseGitHubUrl(url) {
   // Support HTTPS: https://github.com/org/repo.git or https://github.com/org/repo
   // Support SSH: git@github.com:org/repo.git or git@github.com:org/repo
-  const httpsMatch = url.match(/github\.com\/([^/]+)\/([^/.]+?)(?:\.git)?$/);
+  const httpsMatch = url.match(/^https?:\/\/github\.com\/([^/]+)\/([^/.]+?)(?:\.git)?$/);
   if (httpsMatch) {
     return { org: httpsMatch[1], repo: httpsMatch[2], url };
   }

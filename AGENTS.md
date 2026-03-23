@@ -412,6 +412,7 @@ This ensures consistent, scannable questions across all autopilot interactions.
 ```
 todo → in_progress → done
                   → blocked (record reason in progress.txt and STATE.md)
+                  → skipped (CLI unavailable or dependency unresolvable)
 ```
 
 ### Commit Convention
