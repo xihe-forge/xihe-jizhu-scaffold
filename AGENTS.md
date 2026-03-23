@@ -360,6 +360,15 @@ Run `node infra/scripts/health-check.mjs --deploy-ready` to check production rea
 Intake flow offers project type templates: SaaS, Landing Page, API-only, Full-stack.
 Templates pre-configure review gates, discipline settings, optional modules, and starter tasks.
 
+### Git Management
+
+The autopilot enforces git hygiene programmatically:
+- **Post-task safety net**: After each task completes, the autopilot checks for uncommitted changes and auto-commits them
+- **Session-end push**: When all tasks are complete and review converges, the autopilot pushes to the remote
+- **Worktree merge commit**: After merging worktree branches, agents must commit with the task ID in the message
+
+Agents should still commit their own work (atomic, meaningful commits are preferred over auto-commits). The safety net exists to catch cases where the agent forgets.
+
 ### Delivery Rules
 
 - Complete the task in the smallest useful slice

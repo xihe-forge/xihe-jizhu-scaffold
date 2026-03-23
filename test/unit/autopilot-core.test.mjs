@@ -21,8 +21,15 @@ import {
   recordTaskMetrics,
   checkGeminiPrerequisites,
   buildGeminiDelegationBlock,
-  parseCompletionStatus
+  parseCompletionStatus,
+  ensureCleanWorkingTree,
+  pushToRemote
 } from "../../infra/scripts/autopilot-start.mjs";
+
+import {
+  isWorkingTreeClean,
+  getCurrentBranch
+} from "../../infra/scripts/lib/utils.mjs";
 
 import {
   loadNotificationConfig,
@@ -1830,5 +1837,60 @@ describe("parseCompletionStatus", () => {
     assert.equal(result.status, "DONE_WITH_CONCERNS");
     assert.equal(result.details, "some concerns");
     assert.equal(result.raw, true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ensureCleanWorkingTree — post-task git safety net
+// ---------------------------------------------------------------------------
+
+describe("ensureCleanWorkingTree", () => {
+  it("is a function that accepts taskId and taskName", () => {
+    // Verify the function exists and has the expected signature
+    // Do NOT call it — it executes real git commands on the repo
+    assert.equal(typeof ensureCleanWorkingTree, "function");
+    assert.equal(ensureCleanWorkingTree.length, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pushToRemote — session-end push
+// ---------------------------------------------------------------------------
+
+describe("pushToRemote", () => {
+  it("is a function with no required arguments", () => {
+    // Verify the function exists — do NOT call it, it pushes to real remote
+    assert.equal(typeof pushToRemote, "function");
+    assert.equal(pushToRemote.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isWorkingTreeClean — git utility
+// ---------------------------------------------------------------------------
+
+describe("isWorkingTreeClean", () => {
+  it("returns a boolean", () => {
+    const result = isWorkingTreeClean();
+    assert.equal(typeof result, "boolean");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getCurrentBranch — git utility
+// ---------------------------------------------------------------------------
+
+describe("getCurrentBranch", () => {
+  it("returns a non-empty string", () => {
+    const result = getCurrentBranch();
+    assert.equal(typeof result, "string");
+    assert.ok(result.length > 0, "Expected non-empty branch name");
+  });
+
+  it("does not throw even if git is not available", () => {
+    // getCurrentBranch catches errors internally
+    assert.doesNotThrow(() => {
+      getCurrentBranch();
+    });
   });
 });

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, openSync, closeSync, unlinkSync, readFileSync, writeFileSync, renameSync, statSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execSync } from "node:child_process";
 import process from "node:process";
 
 export const rootDir = process.cwd();
@@ -376,6 +376,31 @@ export function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Git utilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if the git working tree is clean (no uncommitted changes).
+ * Returns true if clean, false if dirty.
+ * On error (e.g. git not available), returns true to avoid blocking.
+ */
+export function isWorkingTreeClean() {
+  try {
+    return !execSync("git status --porcelain", { encoding: "utf8", timeout: 10000 }).trim();
+  } catch { return true; }
+}
+
+/**
+ * Get the current git branch name.
+ * Returns "unknown" if git is not available or fails.
+ */
+export function getCurrentBranch() {
+  try {
+    return execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf8", timeout: 5000 }).trim();
+  } catch { return "unknown"; }
 }
 
 export function formatDuration(totalSeconds) {

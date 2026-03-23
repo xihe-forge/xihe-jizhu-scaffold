@@ -16,7 +16,9 @@ import {
   requiresCommandShell,
   rootDir,
   sleep,
-  writeJson
+  writeJson,
+  isWorkingTreeClean,
+  getCurrentBranch
 } from "./lib/utils.mjs";
 import {
   DEFAULT_AUTOPILOT_CONFIG,
@@ -235,6 +237,46 @@ function parseCompletionStatus(output) {
 
 function appendProgressEntry(text) {
   appendFileSync("dev/progress.txt", `${text}\n`, "utf8");
+}
+
+/**
+ * Post-task git safety net: check for uncommitted changes and auto-commit them.
+ * This catches cases where the agent forgets to commit after completing a task.
+ * Uses `git add -A` which respects .gitignore, so sensitive files are not committed.
+ */
+function ensureCleanWorkingTree(taskId, taskName) {
+  try {
+    const status = execSync("git status --porcelain", { encoding: "utf8", timeout: 10000 }).trim();
+    if (!status) return; // already clean
+
+    // Auto-stage and commit uncommitted changes
+    execSync("git add -A", { timeout: 10000 });
+    const msg = `chore: auto-commit after task ${taskId} — ${taskName}`;
+    execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, { encoding: "utf8", timeout: 30000 });
+    appendProgressEntry(`Auto-committed uncommitted changes after task ${taskId}`);
+  } catch (err) {
+    console.warn(`⚠ Auto-commit failed after task ${taskId}: ${err.message} — manual commit may be needed`);
+  }
+}
+
+/**
+ * Session-end push: push the current branch to the remote.
+ * Called when all tasks are complete or final review converges.
+ * NOT called on SIGINT (user may not want to push).
+ */
+function pushToRemote() {
+  try {
+    const remote = execSync("git remote", { encoding: "utf8", timeout: 5000 }).trim().split("\n")[0];
+    if (!remote) return;
+    const branch = getCurrentBranch();
+    if (branch === "unknown") return;
+    console.log(`Pushing to ${remote}/${branch}...`);
+    execSync(`git push ${remote} ${branch}`, { encoding: "utf8", timeout: 60000, stdio: "pipe" });
+    console.log(`✓ Pushed to ${remote}/${branch}`);
+    appendProgressEntry(`Pushed to ${remote}/${branch}`);
+  } catch (err) {
+    console.warn(`⚠ Auto-push failed: ${err.message} — push manually with: git push`);
+  }
 }
 
 function getTaskProgressSummary() {
@@ -926,7 +968,11 @@ function buildPrompt(readyTasks, config) {
         "3. After ALL Agents complete:",
         "   - Review each Agent's changes.",
         "   - Merge branches sequentially into the current branch.",
-        "   - Resolve conflicts if any."
+        "   - Resolve conflicts if any.",
+        "   - After merging all worktree branches:",
+        "     1. `git add -A`",
+        "     2. `git commit -m \"feat(<taskId>): <taskName>\"` (use the primary task ID)",
+        "     3. Verify: `git status` shows clean working tree"
       );
     }
 
@@ -1079,6 +1125,10 @@ function buildPrompt(readyTasks, config) {
       "   - Review each Agent's changes (read the diff or key files).",
       "   - Merge changes from each worktree branch into the current branch.",
       "   - Resolve conflicts if any arise.",
+      "   - After merging all worktree branches:",
+      `     1. \`git add -A\``,
+      `     2. \`git commit -m "feat(${task.id}): ${task.name}"\``,
+      "     3. Verify: `git status` shows clean working tree",
       "5. Run verification: build, lint, or test as appropriate.",
       "6. Update dev/task.json (set status to done).",
       "7. Update dev/progress.txt with what was accomplished.",
@@ -1992,6 +2042,7 @@ async function main() {
       } else {
         console.log("User accepted current state as-is. Marking review as done.");
         saveState({ ...state, status: "final_review_done" });
+        pushToRemote();
         process.exit(0);
       }
     } else if (continueReview) {
@@ -2231,6 +2282,9 @@ async function main() {
         duration: formatDuration(taskDurationMs / 1000),
         cost: result.costUsd ?? 0
       }).catch?.(() => {});
+
+      // Post-task git safety net: auto-commit any uncommitted changes
+      ensureCleanWorkingTree(task.id, task.name);
     }
 
     if (result.failureCategory === "timeout") {
@@ -2366,6 +2420,7 @@ async function main() {
 
               console.log(`Final review completed after ${reviewRound} rounds — no unresolved issues. (${finalSummary.done}/${finalSummary.total})`);
               saveState({ ...loadState(), status: "final_review_done" });
+              pushToRemote();
               break;
             }
 
@@ -2434,6 +2489,7 @@ async function main() {
                   if (newTodoTasks.length < threshold) {
                     console.log(`Review round ${reviewRound}: ${newTodoTasks.length} issue(s) remain (below zero_bug threshold ${threshold}). CONVERGED.`);
                     saveState({ ...loadState(), status: "final_review_done" });
+                    pushToRemote();
                     break;
                   }
                 }
@@ -2448,6 +2504,7 @@ async function main() {
               if (reviewRound >= maxRounds) {
                 console.log(`Final review completed after ${reviewRound} rounds (max reached).`);
                 saveState({ ...loadState(), status: "final_review_done" });
+                pushToRemote();
                 break;
               }
 
@@ -2457,6 +2514,7 @@ async function main() {
                 issues_found: 0
               }).catch?.(() => {});
               saveState({ ...loadState(), status: "final_review_done" });
+              pushToRemote();
               break;
             }
 
@@ -2499,6 +2557,7 @@ async function main() {
             total_tasks: finalSummary.total
           }).catch?.(() => {});
           console.log(`All tasks completed! (${finalSummary.done}/${finalSummary.total})`);
+          pushToRemote();
           break;
         }
 
@@ -2585,4 +2644,4 @@ if (isDirectRun) {
 }
 
 // Export for testing
-export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds, loadSkillInstructions, getSkillExecutionOrder, topoSortSkills, recordTaskMetrics, checkGeminiPrerequisites, buildGeminiDelegationBlock, parseCompletionStatus };
+export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds, loadSkillInstructions, getSkillExecutionOrder, topoSortSkills, recordTaskMetrics, checkGeminiPrerequisites, buildGeminiDelegationBlock, parseCompletionStatus, ensureCleanWorkingTree, pushToRemote };
