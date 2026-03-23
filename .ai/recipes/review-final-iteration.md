@@ -118,7 +118,7 @@ When Opus receives findings from all reviewers:
 The review loop STOPS when:
 
 - **Zero new BUG/SECURITY/COVERAGE GAP findings** in a round, OR
-- **Max review rounds reached** (auto-scales with project complexity: 3–10 rounds, or set explicitly in config)
+- **Max review rounds reached** (auto-scales with project complexity: 5–12 rounds, or set explicitly in config)
 
 If max rounds reached with remaining issues:
 - Write ALL unresolved issues to `dev/review/FINAL-REVIEW-UNRESOLVED.md` with severity breakdown

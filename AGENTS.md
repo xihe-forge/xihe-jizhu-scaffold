@@ -216,6 +216,7 @@ Review gate configuration is in `.planning/config.json` under `review_gates`.
 | **Testing complete** | `.ai/recipes/review-test-coverage.md` | (scaffold built-in) | YES |
 | **Marketing materials created** | `.ai/recipes/review-marketing.md` | (scaffold built-in) | No (advisory) |
 | **Public pages deployed** | `.ai/recipes/review-seo-aeo.md` | xihe-search-forge | No (advisory) |
+| **All tasks complete** | `.ai/recipes/review-final-iteration.md` | impeccable, vercel-web-design | YES |
 
 **Supplementary Checklists** (referenced by review recipes):
 - `.ai/recipes/frontend-review-checklist.md` — real-world frontend bugs (layout, auth UI, pricing, responsive, i18n). **Mandatory** for all frontend code reviews.

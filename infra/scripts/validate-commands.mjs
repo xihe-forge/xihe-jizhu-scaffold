@@ -10,7 +10,14 @@ if (!existsSync(registryPath)) {
   console.error("FAIL: command-registry.json not found at", registryPath);
   process.exit(1);
 }
-const registry = JSON.parse(readFileSync(registryPath, "utf8"));
+
+let registry;
+try {
+  registry = JSON.parse(readFileSync(registryPath, "utf8"));
+} catch (err) {
+  console.error(`FAIL: could not parse command-registry.json — ${err.message}`);
+  process.exit(1);
+}
 
 // Load skill registry
 const skillRegistryPath = path.join(root, ".ai", "skills", "skill-registry.json");
@@ -18,21 +25,41 @@ if (!existsSync(skillRegistryPath)) {
   console.error("FAIL: skill-registry.json not found at", skillRegistryPath);
   process.exit(1);
 }
-const skillRegistry = JSON.parse(readFileSync(skillRegistryPath, "utf8"));
+
+let skillRegistry;
+try {
+  skillRegistry = JSON.parse(readFileSync(skillRegistryPath, "utf8"));
+} catch (err) {
+  console.error(`FAIL: could not parse skill-registry.json — ${err.message}`);
+  process.exit(1);
+}
 
 // Build set of valid skill IDs from skill-registry.json
 const validSkills = new Set();
-for (const [moduleName, moduleData] of Object.entries(skillRegistry.skills)) {
-  if (moduleData.skills) {
-    for (const skillName of Object.keys(moduleData.skills)) {
-      validSkills.add(`${moduleName}/${skillName}`);
+if (skillRegistry.skills) {
+  for (const [moduleName, moduleData] of Object.entries(skillRegistry.skills)) {
+    if (moduleData && moduleData.skills) {
+      for (const skillName of Object.keys(moduleData.skills)) {
+        validSkills.add(`${moduleName}/${skillName}`);
+      }
     }
   }
 }
 
 let errors = 0;
 
+if (!registry.commands) {
+  console.error("FAIL: command-registry.json has no \"commands\" property");
+  process.exit(1);
+}
+
 for (const [cmdName, cmdMeta] of Object.entries(registry.commands)) {
+  if (!cmdMeta) {
+    console.error(`FAIL: command "${cmdName}" has null/undefined metadata`);
+    errors++;
+    continue;
+  }
+
   // Check template exists
   const tmplPath = path.join(commandsDir, `${cmdName}.md.tmpl`);
   if (!existsSync(tmplPath)) {
@@ -43,23 +70,27 @@ for (const [cmdName, cmdMeta] of Object.entries(registry.commands)) {
   }
 
   // Check skills exist in skill-registry.json
-  for (const skillId of cmdMeta.skills || []) {
-    if (!validSkills.has(skillId)) {
-      console.error(`FAIL: command "${cmdName}" references unknown skill "${skillId}"`);
-      errors++;
-    } else {
-      console.log(`OK: skill "${skillId}" found in skill-registry.json`);
+  if (cmdMeta.skills) {
+    for (const skillId of cmdMeta.skills) {
+      if (!validSkills.has(skillId)) {
+        console.error(`FAIL: command "${cmdName}" references unknown skill "${skillId}"`);
+        errors++;
+      } else {
+        console.log(`OK: skill "${skillId}" found in skill-registry.json`);
+      }
     }
   }
 
   // Check recipe files exist on disk
-  for (const recipe of cmdMeta.recipes || []) {
-    const recipePath = path.join(root, ".ai", "recipes", recipe);
-    if (!existsSync(recipePath)) {
-      console.error(`FAIL: command "${cmdName}" references missing recipe "${recipe}" (expected at ${recipePath})`);
-      errors++;
-    } else {
-      console.log(`OK: recipe "${recipe}" exists on disk`);
+  if (cmdMeta.recipes) {
+    for (const recipe of cmdMeta.recipes) {
+      const recipePath = path.join(root, ".ai", "recipes", recipe);
+      if (!existsSync(recipePath)) {
+        console.error(`FAIL: command "${cmdName}" references missing recipe "${recipe}" (expected at ${recipePath})`);
+        errors++;
+      } else {
+        console.log(`OK: recipe "${recipe}" exists on disk`);
+      }
     }
   }
 }

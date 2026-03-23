@@ -10,7 +10,6 @@
       "recipes": [
         "review-code.md",
         "review-test-coverage.md",
-        "frontend-review-checklist.md",
         "error-handling-and-logging.md"
       ]
     },

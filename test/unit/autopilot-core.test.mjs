@@ -1807,4 +1807,28 @@ describe("parseCompletionStatus", () => {
     assert.equal(result.details, "");
     assert.equal(result.raw, true);
   });
+
+  it("parses correctly with CRLF line endings", () => {
+    const output = "line1\r\nSTATUS: DONE\r\n";
+    const result = parseCompletionStatus(output);
+    assert.equal(result.status, "DONE");
+    assert.equal(result.raw, true);
+    assert.equal(result.details, "");
+  });
+
+  it("matches ASCII hyphen separator", () => {
+    const output = "STATUS: BLOCKED - reason here";
+    const result = parseCompletionStatus(output);
+    assert.equal(result.status, "BLOCKED");
+    assert.equal(result.details, "reason here");
+    assert.equal(result.raw, true);
+  });
+
+  it("matches double-hyphen separator", () => {
+    const output = "STATUS: DONE_WITH_CONCERNS -- some concerns";
+    const result = parseCompletionStatus(output);
+    assert.equal(result.status, "DONE_WITH_CONCERNS");
+    assert.equal(result.details, "some concerns");
+    assert.equal(result.raw, true);
+  });
 });

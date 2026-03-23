@@ -1,4 +1,4 @@
-import { appendFileSync, createWriteStream, rmSync, readdirSync } from "node:fs";
+import { appendFileSync, createWriteStream, readFileSync, rmSync, readdirSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { spawn, execSync } from "node:child_process";
@@ -223,9 +223,9 @@ function getProgressTail() {
  */
 function parseCompletionStatus(output) {
   if (!output) return { status: "DONE", details: "", raw: false };
-  const lines = output.split("\n").slice(-20);
+  const lines = output.split(/\r?\n/).slice(-20);
   for (let i = lines.length - 1; i >= 0; i--) {
-    const match = lines[i].match(/^STATUS:\s*(DONE_WITH_CONCERNS|DONE|BLOCKED|NEEDS_CONTEXT)\s*(?:—\s*(.*))?$/u);
+    const match = lines[i].match(/^STATUS:\s*(DONE_WITH_CONCERNS|DONE|BLOCKED|NEEDS_CONTEXT)\s*(?:(?:—|--|[-–])\s*(.*))?$/u);
     if (match) {
       return { status: match[1], details: (match[2] ?? "").trim(), raw: true };
     }
@@ -1968,11 +1968,9 @@ async function main() {
       });
       const newMax = currentRound + additionalRounds;
       console.log(`Extending review: ${additionalRounds} more rounds (new max: ${newMax}).`);
-      // Temporarily override config max_rounds for this session
-      if (!planConfig.final_review) planConfig.final_review = {};
-      planConfig.final_review.max_rounds = newMax;
-      writeJson(".planning/config.json", planConfig);
-      saveState({ ...state, status: "final_review", finalReviewRound: currentRound });
+      // Store extended max in state (runtime only) — do NOT write to config.json
+      // to avoid permanently inflating max_rounds across sessions
+      saveState({ ...state, status: "final_review", finalReviewRound: currentRound, sessionMaxRounds: newMax });
       console.log("Resuming review...");
     } else {
       console.log("");
@@ -2136,17 +2134,31 @@ async function main() {
 
     // Notify on task completion or failure (non-blocking)
     if (result.exitCode === 0 && task) {
-      // Parse agent completion status protocol
-      const completionStatus = parseCompletionStatus(result.output ?? "");
+      // Parse agent completion status protocol — read from assistant output log
+      // since invokeRunner does not return an output field
+      let agentOutput = "";
+      try {
+        const fullOutput = readFileSync(".autopilot/logs/assistant-output.log", "utf8");
+        const outputLines = fullOutput.split(/\r?\n/);
+        agentOutput = outputLines.slice(-20).join("\n");
+      } catch { /* file may not exist */ }
+      const completionStatus = parseCompletionStatus(agentOutput);
       if (!completionStatus.raw) {
         console.warn("⚠ Agent did not emit completion status — treating as DONE");
       }
       if (completionStatus.status === "BLOCKED") {
         console.error(`Task blocked: ${completionStatus.details} — check task dependencies in dev/task.json or reassign blocked tasks`);
-        // mark task as blocked instead of complete — skip the normal completion flow
+        // Mark the task as "blocked" in task.json so it won't be picked again
+        const allTasks = readJson("dev/task.json", { tasks: [] });
+        const blockedTask = (allTasks.tasks ?? []).find((t) => t.id === task.id);
+        if (blockedTask) {
+          blockedTask.status = "blocked";
+          writeJson("dev/task.json", allTasks);
+        }
+        appendProgressEntry(`Task ${task.id} BLOCKED: ${completionStatus.details}`);
         saveState({
           ...loadState(),
-          status: "waiting_retry",
+          status: "running",
           lastTaskId: task.id,
           lastFailureCategory: "blocked",
           lastFailureHint: completionStatus.details
@@ -2156,6 +2168,20 @@ async function main() {
       }
       if (completionStatus.status === "NEEDS_CONTEXT") {
         console.warn(`Task needs context: ${completionStatus.details} — autopilot pausing for user input`);
+        appendProgressEntry(`Task ${task.id} NEEDS_CONTEXT: ${completionStatus.details}`);
+        saveState({
+          ...loadState(),
+          status: "awaiting_user_decision",
+          lastTaskId: task.id,
+          needsContextDetails: completionStatus.details
+        });
+        notify("awaiting_user_decision", {
+          task_id: task.id,
+          task_name: task.name,
+          reason: "needs_context",
+          details: completionStatus.details
+        }).catch?.(() => {});
+        break;
       }
       if (completionStatus.status === "DONE_WITH_CONCERNS") {
         appendProgressEntry(`Task ${task.id} completed with concerns: ${completionStatus.details}`);
@@ -2252,7 +2278,9 @@ async function main() {
 
           if (finalReviewEnabled && currentStatus !== "final_review_done" && currentStatus !== "awaiting_user_decision") {
             const reviewStrategy = planConfig?.review_strategy;
-            const maxRounds = computeMaxReviewRounds({
+            // Use sessionMaxRounds from state if set by --continue-review, otherwise compute
+            const stateMaxRounds = loadState().sessionMaxRounds;
+            const maxRounds = stateMaxRounds ?? computeMaxReviewRounds({
               taskCount: finalSummary.total,
               sourceFileCount: countSourceFiles(),
               configMaxRounds: planConfig.final_review.max_rounds,

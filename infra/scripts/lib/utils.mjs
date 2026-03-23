@@ -6,6 +6,9 @@ import process from "node:process";
 
 export const rootDir = process.cwd();
 
+/** Unique sentinel — distinguishes "no fallback provided" from any valid fallback value. */
+const NO_FALLBACK = Symbol("no-fallback");
+
 // --- File Locking ---
 
 const LOCK_STALE_TIMEOUT_MS = 30_000; // 30 seconds
@@ -132,11 +135,11 @@ export function pathExists(relativePath) {
   return existsSync(resolvePath(relativePath));
 }
 
-export function readJson(relativePath, fallback = null) {
+export function readJson(relativePath, fallback = NO_FALLBACK) {
   try {
     return JSON.parse(readFileSync(resolvePath(relativePath), "utf8"));
   } catch (err) {
-    if (fallback !== null) return fallback;
+    if (fallback !== NO_FALLBACK) return fallback;
     throw new Error(`Failed to read JSON from ${relativePath}: ${err.message} — run pnpm kickoff to initialize the project first`);
   }
 }
@@ -145,16 +148,21 @@ export function writeJson(relativePath, data) {
   const absolutePath = resolvePath(relativePath);
   withFileLock(absolutePath, () => {
     const tmpPath = `${absolutePath}.tmp.${process.pid}`;
-    writeFileSync(tmpPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-    renameSync(tmpPath, absolutePath);
+    try {
+      writeFileSync(tmpPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+      renameSync(tmpPath, absolutePath);
+    } catch (err) {
+      try { unlinkSync(tmpPath); } catch { /* ignore cleanup errors */ }
+      throw err;
+    }
   });
 }
 
-export function readText(relativePath, fallback = "") {
+export function readText(relativePath, fallback = NO_FALLBACK) {
   try {
     return readFileSync(resolvePath(relativePath), "utf8");
   } catch (err) {
-    if (fallback !== "") return fallback;
+    if (fallback !== NO_FALLBACK) return fallback;
     throw new Error(`Failed to read text from ${relativePath}: ${err.message} — run pnpm kickoff to initialize the project first`);
   }
 }
@@ -163,8 +171,13 @@ export function writeText(relativePath, content) {
   const absolutePath = resolvePath(relativePath);
   withFileLock(absolutePath, () => {
     const tmpPath = `${absolutePath}.tmp.${process.pid}`;
-    writeFileSync(tmpPath, content, "utf8");
-    renameSync(tmpPath, absolutePath);
+    try {
+      writeFileSync(tmpPath, content, "utf8");
+      renameSync(tmpPath, absolutePath);
+    } catch (err) {
+      try { unlinkSync(tmpPath); } catch { /* ignore cleanup errors */ }
+      throw err;
+    }
   });
 }
 
