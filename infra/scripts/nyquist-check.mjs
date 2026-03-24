@@ -66,10 +66,11 @@ function isCovered(criterion, taskId, testCorpus) {
   const text = typeof criterion === "object" ? criterion.text : criterion;
 
   // Form 2 & 3: search test files
+  const assertionPattern = /\bassert\b|\.expect\b|expect\(|\.toBe\b|\.toEqual\b|\btest\(|\bit\(|\bdescribe\(/;
   for (const { content } of testCorpus) {
-    // Task ID mention (e.g. "T005")
-    if (content.includes(taskId)) {
-      // The file mentions this task — consider it covering all criteria for the task
+    // Task ID mention (e.g. "T005") — only counts if the file also contains real assertions
+    if (content.includes(taskId) && assertionPattern.test(content)) {
+      // The file mentions this task and has assertions — consider it covering all criteria for the task
       return true;
     }
     // Criterion text fragment: use the first 40 chars (trimmed) as a fingerprint

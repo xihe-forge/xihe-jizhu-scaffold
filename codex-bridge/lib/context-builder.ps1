@@ -221,13 +221,18 @@ function Get-RelevantFiles {
     # 3. Type-based heuristics
     $taskNameLower = $nameText.ToLower()
 
-    # Find project subdirectory containing package.json or apps/
-    $projectDirs = Get-ChildItem -Path $ProjectRoot -Directory |
-        Where-Object { Test-Path (Join-Path $_.FullName "package.json") -or Test-Path (Join-Path $_.FullName "apps") } |
-        Select-Object -First 1
+    # Find project base: check $ProjectRoot itself first, then child directories
+    $projBase = $null
+    if (Test-Path (Join-Path $ProjectRoot "package.json") -or Test-Path (Join-Path $ProjectRoot "apps")) {
+        $projBase = $ProjectRoot
+    } else {
+        $projectDirs = Get-ChildItem -Path $ProjectRoot -Directory |
+            Where-Object { Test-Path (Join-Path $_.FullName "package.json") -or Test-Path (Join-Path $_.FullName "apps") } |
+            Select-Object -First 1
+        if ($projectDirs) { $projBase = $projectDirs.FullName }
+    }
 
-    if ($projectDirs) {
-        $projBase = $projectDirs.FullName
+    if ($projBase) {
 
         # If task mentions "entity" or "model", include types
         if ($taskNameLower -match 'entity|model|type|schema') {

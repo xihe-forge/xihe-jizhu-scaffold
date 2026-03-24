@@ -64,7 +64,7 @@ robust-ai-scaffold/
 ├── packages/           # Shared code and types
 ├── docs/               # Research, MRD, PRD, tech specs, design docs
 ├── dev/                # task.json, progress.txt, metrics.json, bug fixes, review logs
-├── test/               # Unit and integration tests
+├── test/               # Unit tests (163 tests across 26 test suites)
 ├── infra/scripts/      # Autopilot engine, intake flow, health checks
 │   └── lib/            # Shared utilities (ai-runner, autopilot-runner, project-setup, utils)
 ├── codex-bridge/       # PowerShell module for Codex CLI delegation
@@ -183,7 +183,7 @@ The scaffold's core architecture (autopilot, intake, review pipeline) is self-co
 
 | Module | Role | Source |
 |--------|------|--------|
-| **impeccable** | Frontend design generation & refinement, anti-AI-slop aesthetics (10 skills + 7 reference docs) | [impeccable](https://github.com/pbakaus/impeccable) |
+| **impeccable** | Frontend design generation & refinement, anti-AI-slop aesthetics (10 registered skills + 7 reference docs) | [impeccable](https://github.com/pbakaus/impeccable) |
 | **vercel-web-design** | Engineering UX quality gate (accessibility, performance, standards) | [vercel-labs](https://github.com/vercel-labs/agent-skills) |
 | **xihe-search-forge** | SEO/GEO/AEO audit, AI search engine optimization, structured data validation | [xihe-forge](https://github.com/xihe-forge/xihe-search-forge) |
 
@@ -249,7 +249,6 @@ All Tasks Complete ----> review-final-iteration.md [BLOCKING]  (multi-AI converg
 Each gate specifies:
 - **Recipe**: the review playbook to follow (in `.ai/recipes/`)
 - **Tools**: opensource skill modules referenced during review
-- **Triggers**: file path patterns that activate the gate
 - **Blocking**: whether the gate must pass before proceeding
 
 **Supplementary checklists** referenced by review recipes:

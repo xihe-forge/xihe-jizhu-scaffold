@@ -216,12 +216,18 @@ function Get-GeminiRelevantFiles {
     # 3. Type-based heuristics
     $taskNameLower = $nameText.ToLower()
 
-    $projectDirs = Get-ChildItem -Path $ProjectRoot -Directory |
-        Where-Object { Test-Path (Join-Path $_.FullName "package.json") -or Test-Path (Join-Path $_.FullName "apps") } |
-        Select-Object -First 1
+    # Find project base: check $ProjectRoot itself first, then child directories
+    $projBase = $null
+    if (Test-Path (Join-Path $ProjectRoot "package.json") -or Test-Path (Join-Path $ProjectRoot "apps")) {
+        $projBase = $ProjectRoot
+    } else {
+        $projectDirs = Get-ChildItem -Path $ProjectRoot -Directory |
+            Where-Object { Test-Path (Join-Path $_.FullName "package.json") -or Test-Path (Join-Path $_.FullName "apps") } |
+            Select-Object -First 1
+        if ($projectDirs) { $projBase = $projectDirs.FullName }
+    }
 
-    if ($projectDirs) {
-        $projBase = $projectDirs.FullName
+    if ($projBase) {
 
         if ($taskNameLower -match 'entity|model|type|schema') {
             $typesDir = Join-Path $projBase "packages\types\src"

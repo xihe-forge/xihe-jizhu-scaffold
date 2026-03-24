@@ -776,7 +776,13 @@ function loadSkillInstructions(tasks, phase = "implement") {
     const tagMatch = (trigger.task_tags || []).some((tag) => taskTags.has(tag));
     if (!phaseMatch && !tagMatch) continue;
 
-    const skillEntries = Object.entries(mod.skills || {});
+    // Filter individual skills by their phase field when present
+    const allSkillEntries = Object.entries(mod.skills || {});
+    const skillEntries = allSkillEntries.filter(([, skill]) => {
+      const skillPhases = skill.phases ?? (skill.phase ? [skill.phase] : null);
+      if (!skillPhases) return true; // no phase restriction on skill — include it
+      return skillPhases.includes(phase);
+    });
     if (skillEntries.length === 0) continue;
 
     matchedModules.push({ moduleId, mod, skillEntries });
@@ -1735,6 +1741,8 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
   }
 
   const logStream = createWriteStream(".autopilot/logs/autopilot.log", { flags: "a" });
+  // Each invokeRunner call overwrites this file so STATUS parsing only sees the current task's output.
+  // If this is a retry (e.g. missingSessionDetected), the previous attempt's output is lost — check autopilot.log for full history.
   const outputStream = createWriteStream(".autopilot/logs/assistant-output.log", { flags: "w" });
   /** Mutable accumulator for usage metrics captured from streamed events */
   const usageAccum = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
@@ -1774,7 +1782,7 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
   const timeoutHandle = setTimeout(() => {
     timedOut = true;
     console.error(`[timeout] Task exceeded ${taskTimeoutSeconds}s limit. Terminating child process tree.`);
-    if (process.platform === "win32") {
+    if (process.platform === "win32" && child.pid) {
       // On Windows, child.kill() only kills the wrapper (cmd.exe), not grandchildren.
       // Use taskkill /T (tree) to kill the entire process tree.
       try {
@@ -1786,7 +1794,7 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
     sigkillTimer = setTimeout(() => {
       if (!child.killed) {
         console.error("[timeout] Child did not exit after termination signal. Force-killing.");
-        if (process.platform === "win32") {
+        if (process.platform === "win32" && child.pid) {
           try {
             spawnSync("taskkill", ["/T", "/F", "/PID", String(child.pid)], { stdio: "ignore", timeout: 5000 });
           } catch { /* best-effort */ }
@@ -2120,6 +2128,8 @@ async function main() {
   });
 
   const taskRetryMap = new Map();
+  let unavailableCliPollCount = 0;
+  const MAX_UNAVAILABLE_CLI_POLLS = 10;
 
   while (true) {
     // Invalidate cached state at the start of each iteration so we pick up
@@ -2165,12 +2175,20 @@ async function main() {
     if (readyTasks.length === 0) {
       const originalReady = getReadyTasks();
       if (originalReady.length > 0) {
-        console.warn(`[autopilot] All ready tasks require unavailable CLI tools. Waiting for next round. — install the required CLI tool or reassign the task to an available runner`);
+        unavailableCliPollCount++;
+        if (unavailableCliPollCount >= MAX_UNAVAILABLE_CLI_POLLS) {
+          console.error(`[autopilot] All remaining tasks require unavailable CLIs. Reassign tasks or install the required CLI. Autopilot stopping.`);
+          saveState({ ...loadState(), status: "blocked" });
+          break;
+        }
+        console.warn(`[autopilot] All ready tasks require unavailable CLI tools (attempt ${unavailableCliPollCount}/${MAX_UNAVAILABLE_CLI_POLLS}). Waiting for next round. — install the required CLI tool or reassign the task to an available runner`);
         if (runOnce) break;
         await waitWithCountdown(1);
         continue;
       }
     }
+    // Reset counter once tasks are available through normal runners
+    unavailableCliPollCount = 0;
 
     // Compute task/model/prompt AFTER codex/gemini filtering so they reflect the actual work
     const task = readyTasks.length > 0 ? readyTasks[0] : null;

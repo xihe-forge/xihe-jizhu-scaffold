@@ -300,7 +300,6 @@ async function runPromptWithSimpleRetry({ config, model, prompt, label, maxRetri
   let quotaAttempts = 0;
 
   while (true) {
-    attempt += 1;
     const result = await runTextPrompt({ config, model, prompt });
     if (result.exitCode === 0) {
       return result;
@@ -312,6 +311,8 @@ async function runPromptWithSimpleRetry({ config, model, prompt, label, maxRetri
 
     if (isQuota) {
       quotaAttempts += 1;
+    } else {
+      attempt += 1;
     }
 
     if (!isQuota && attempt >= maxRetries) {

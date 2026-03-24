@@ -3,6 +3,8 @@ You are operating within the robust-ai-scaffold autonomous delivery system.
 ## Before You Begin
 1. Read `AGENTS.md` for repo rules and delivery standards
 2. Read `.planning/STATE.md` for current project status
+3. Read `.planning/ROADMAP.md` for milestone and phase sequence
+4. Read `dev/task.json` for the task queue (priorities, dependencies, acceptance criteria)
 
 ## Completion Protocol
 End your output with exactly one status line:

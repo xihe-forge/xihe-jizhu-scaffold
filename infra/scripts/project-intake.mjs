@@ -456,7 +456,7 @@ function buildPlanPrompt({ projectBrief, constraints, clarification }) {
     '    {',
     '      "id": "T001",',
     '      "phase": "Phase 1: Name",',
-    '      "type": "planning|research|docs|backend|frontend|testing|review",',
+    '      "type": "planning|research|implementation|testing|review|docs",',
     '      "name": "task name",',
     '      "description": "task description",',
     '      "priority": "P0|P1|P2",',
@@ -1051,7 +1051,7 @@ async function main() {
     if (!planConfig.optional_modules) planConfig.optional_modules = {};
     planConfig.optional_modules.payment = {
       ...(planConfig.optional_modules.payment ?? {}),
-      enabled: paymentEnabled,
+      enabled: paymentEnabled ?? planConfig.optional_modules.payment?.enabled ?? false,
       provider: "creem",
       recipe: ".ai/recipes/payment-integration-guide.md",
       payout_method: "wise"

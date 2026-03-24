@@ -231,7 +231,7 @@ Review gate configuration is in `.planning/config.json` under `review_gates`.
 
 **Review Tool Integration:**
 
-When a task involves files matching a review gate's triggers (e.g., `docs/prd/` triggers `mrd_prd_review`):
+When a task reaches the appropriate stage (e.g., PRD created triggers `mrd_prd_review`):
 
 1. **Before marking the task done**, the orchestrator must read the corresponding review recipe
 2. **Apply each check** from the recipe using the specified opensource tool's methodology
