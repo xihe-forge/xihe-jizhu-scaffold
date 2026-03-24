@@ -26,7 +26,13 @@ If you prefer a menu instead of the direct interview, run:
 pnpm start-here
 ```
 
-The wizard now asks one simple runtime question:
+The wizard first asks you to choose a configuration mode:
+
+- **One-click** -- minimal questions, auto-starts autopilot
+- **Standard** -- adds review strategy and AI runtime selection
+- **Advanced** -- adds parallelization, TDD, code review toggles, bug threshold
+
+In standard and advanced modes, you then select the AI runtime:
 
 - `Claude Code CLI`
 - `Codex CLI`
@@ -147,7 +153,7 @@ Use $create-project-from-scaffold to create a new project from <template-path>\r
 - package scope: `@my-new-project`
 - keep `.planning/` under version control
 - keep `.autopilot/config.json` under version control
-- keep `docs/intake/PROJECT-INTAKE.md` under version control
+- keep `docs/intake/PROJECT-INTAKE.md` under version control (generated during intake)
 - do not commit `.intake/state.json`; it is only for interrupted kickoff recovery
 - replace placeholder `apps/web` and `apps/api` bootstraps early
 - use `pnpm autopilot:configure` instead of hand-editing runner fields unless you need an advanced custom command

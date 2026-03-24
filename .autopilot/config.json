@@ -73,6 +73,18 @@
           "{{prompt}}"
         ]
       },
+      "gemini": {
+        "displayName": "Google Gemini CLI",
+        "command": "gemini",
+        "supportsResume": false,
+        "promptTransport": "stdin",
+        "outputParser": "plain-text",
+        "doctorArgs": [
+          "--help"
+        ],
+        "newSessionArgs": [],
+        "resumeSessionArgs": []
+      },
       "custom": {
         "displayName": "Custom AI command",
         "command": "",

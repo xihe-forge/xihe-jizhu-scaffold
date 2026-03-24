@@ -1051,7 +1051,7 @@ async function main() {
     if (!planConfig.optional_modules) planConfig.optional_modules = {};
     planConfig.optional_modules.payment = {
       ...(planConfig.optional_modules.payment ?? {}),
-      enabled: paymentEnabled ?? planConfig.optional_modules.payment?.enabled ?? false,
+      enabled: paymentEnabled || planConfig.optional_modules.payment?.enabled || false,
       provider: "creem",
       recipe: ".ai/recipes/payment-integration-guide.md",
       payout_method: "wise"
@@ -1077,7 +1077,7 @@ async function main() {
             newTasks.push({
               id: taskId,
               phase: selectedTemplate.suggested_phases?.[0] ?? "Phase 1",
-              type: starterTask.type ?? "feature",
+              type: starterTask.type ?? "implementation",
               name: starterTask.name,
               description: `Starter task from ${selectedTemplate.name} template.`,
               priority: starterTask.priority ?? "P1",

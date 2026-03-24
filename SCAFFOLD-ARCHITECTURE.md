@@ -32,6 +32,15 @@ The `.ai/` directory is runtime-agnostic and stores:
 - hook notes
 - `.ai/skills/` -- skill modules (impeccable, vercel-web-design, xihe-search-forge) and the skill registry (`skill-registry.json`)
 
+## Layer 4: Runtime Bridges
+
+External AI CLI integrations for multi-runtime delegation:
+
+- `codex-bridge/` -- PowerShell module for delegating tasks to OpenAI Codex CLI
+- `gemini-bridge/` -- PowerShell module for delegating tasks to Google Gemini CLI
+
+These are invoked by the autopilot orchestrator when a task's `assignee` is `"codex"` or `"gemini"`.
+
 ## Robustness Goals
 
 - Recover after interrupted sessions

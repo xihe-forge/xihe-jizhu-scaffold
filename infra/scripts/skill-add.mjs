@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import {
   promptChoice,
   promptText,
@@ -22,12 +23,12 @@ const SKILLS_DIR = ".ai/skills";
 function parseGitHubUrl(url) {
   // Support HTTPS: https://github.com/org/repo.git or https://github.com/org/repo
   // Support SSH: git@github.com:org/repo.git or git@github.com:org/repo
-  const httpsMatch = url.match(/^https?:\/\/github\.com\/([^/]+)\/([^/.]+?)(?:\.git)?$/);
+  const httpsMatch = url.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/);
   if (httpsMatch) {
     return { org: httpsMatch[1], repo: httpsMatch[2], url };
   }
 
-  const sshMatch = url.match(/^git@github\.com:([^/]+)\/([^/.]+?)(?:\.git)?$/);
+  const sshMatch = url.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);
   if (sshMatch) {
     return { org: sshMatch[1], repo: sshMatch[2], url };
   }
@@ -409,7 +410,7 @@ async function main() {
   });
 }
 
-const isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"));
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isDirectRun) {
   main().catch((err) => {
     console.error(`\nError: ${err.message}`);

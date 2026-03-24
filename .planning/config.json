@@ -93,7 +93,7 @@
   "review_tools": {
     "impeccable": {
       "path": ".ai/skills/impeccable",
-      "description": "Frontend design anti-patterns, 17 audit commands"
+      "description": "Frontend design anti-patterns, 21 audit commands"
     },
     "vercel-web-design": {
       "path": ".ai/skills/vercel-web-design",

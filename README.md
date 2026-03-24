@@ -66,7 +66,7 @@ robust-ai-scaffold/
 ├── dev/                # task.json, progress.txt, metrics.json, bug fixes, review logs
 ├── test/               # Unit tests (163 tests across 26 test suites)
 ├── infra/scripts/      # Autopilot engine, intake flow, health checks
-│   └── lib/            # Shared utilities (ai-runner, autopilot-runner, project-setup, utils)
+│   └── lib/            # Shared utilities (ai-runner, autopilot-runner, project-setup, utils, notifications, skill-utils)
 ├── codex-bridge/       # PowerShell module for Codex CLI delegation
 ├── gemini-bridge/      # PowerShell module for Gemini CLI delegation
 ├── AGENTS.md           # Agent behavior rules (read before every round)
@@ -161,6 +161,10 @@ pnpm validate:commands   # Validate command registry (skill paths, recipe paths)
 ```
 
 ### CLI Slash Commands
+
+Commands in `.claude/commands/` are generated from `.md.tmpl` templates via `pnpm gen:commands`. Each template contains a `{{PREAMBLE}}` placeholder that is replaced with shared context from `preamble.md`, keeping all commands consistent without manual duplication.
+
+`pnpm validate:commands` checks that every template file exists, every skill referenced in `command-registry.json` resolves to an entry in `skill-registry.json`, and every recipe path resolves to a file in `.ai/recipes/`.
 
 Available via `.claude/commands/`:
 
@@ -399,6 +403,12 @@ Max rounds reached with unresolved issues:
 - The review loop converges when zero new BUG/SECURITY/COVERAGE GAP issues are found
 - `awaiting_user_decision` ensures humans have final say when issues persist after max rounds
 
+**Dependency ID validation**: Task `depends_on` entries referencing unknown IDs are warned and treated as unsatisfied rather than silently skipped. Circular dependencies are detected via DFS graph coloring before the run begins.
+
+**Windows process tree termination**: On timeout, the autopilot uses `taskkill /T /F` to kill the entire process tree, preventing orphaned AI CLI processes from accumulating across sessions.
+
+**Git safety**: `ensureCleanWorkingTree()` auto-commits any unstaged changes after each task completes. `pushToRemote()` pushes when all tasks are done. All git commands use `spawnSync` with argument arrays to prevent shell injection.
+
 ## Multi-Runtime Support
 
 The scaffold is runtime-agnostic. Configure once, switch anytime:
@@ -410,6 +420,7 @@ pnpm autopilot:configure
 Supported runtimes:
 - **Claude CLI** -- `claude` with `--print` mode
 - **Codex CLI** -- OpenAI's `codex` with `--full-auto`
+- **Gemini CLI** -- Google's `gemini` delegated via `gemini-bridge/`
 - **Custom** -- any CLI that accepts a prompt on stdin and returns output on stdout
 
 ## Deploy Readiness

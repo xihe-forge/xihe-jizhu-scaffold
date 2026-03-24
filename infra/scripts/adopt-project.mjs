@@ -101,7 +101,7 @@ function buildAdoptPrompt({ projectDescription, workGoal, currentStatus, scan })
     '    {',
     '      "id": "T001",',
     '      "phase": "Phase 1: Name",',
-    '      "type": "planning|research|docs|backend|frontend|testing|review",',
+    '      "type": "planning|research|implementation|testing|review|docs",',
     '      "name": "task name",',
     '      "description": "task description",',
     '      "priority": "P0|P1|P2",',

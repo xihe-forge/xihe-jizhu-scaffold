@@ -176,10 +176,10 @@ if (envProdContent !== null) {
 // 2. Secrets in Source Code
 // ===================================================================
 
-const secretPattern = /['"]\s*\w*(?:key|secret|password|token|api.?key)['"]\s*[:=]\s*['"][^'"]{8,}/i;
+const secretPattern = /['"]\s*\w*(?:key|secret|password|token|api.?key)['"]\s*[:=]\s*['"][^'"]{8,}/iu;
 
 // Source directories to scan
-const sourceDirs = ["src", "apps", "packages"].filter((d) => existsSync(path.join(root, d)));
+const sourceDirs = ["src", "apps", "packages", "infra"].filter((d) => existsSync(path.join(root, d)));
 
 let secretsFound = false;
 

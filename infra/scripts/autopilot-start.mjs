@@ -1,4 +1,4 @@
-import { appendFileSync, createWriteStream, readFileSync, rmSync, readdirSync } from "node:fs";
+import { appendFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, readdirSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { spawn, execSync, spawnSync } from "node:child_process";
@@ -29,7 +29,7 @@ import {
   renderRunnerSummary,
   resolveRunnerProfile
 } from "./lib/autopilot-runner.mjs";
-import { notify, notifyStateChange } from "./lib/notifications.mjs";
+import { notify } from "./lib/notifications.mjs";
 
 const args = process.argv.slice(2);
 const isDryRun = args.includes("--dry-run");
@@ -245,6 +245,10 @@ function parseCompletionStatus(output) {
 }
 
 function appendProgressEntry(text) {
+  if (!existsSync("dev/progress.txt")) {
+    mkdirSync("dev", { recursive: true });
+    writeFileSync("dev/progress.txt", "", "utf8");
+  }
   appendFileSync("dev/progress.txt", `${text}\n`, "utf8");
 }
 
@@ -2154,7 +2158,7 @@ async function main() {
 
     // Pre-flight: if any ready task needs codex, verify prerequisites — skip codex tasks if not available (#R4-3)
     const hasCodexTasks = readyTasks.some(t => t.assignee === "codex");
-    const codexCheck = hasCodexTasks ? checkCodexPrerequisites() : { available: false, issues: [] };
+    const codexCheck = hasCodexTasks ? checkCodexPrerequisites() : { available: true, issues: [] };
     if (!codexCheck.available) {
       const codexTasks = readyTasks.filter((t) => t.assignee === "codex");
       if (codexTasks.length > 0) {
@@ -2167,7 +2171,7 @@ async function main() {
 
     // Pre-flight: if any ready task needs gemini, verify prerequisites — skip gemini tasks if not available
     const hasGeminiTasks = readyTasks.some(t => t.assignee === "gemini");
-    const geminiCheck = hasGeminiTasks ? checkGeminiPrerequisites() : { available: false, issues: [] };
+    const geminiCheck = hasGeminiTasks ? checkGeminiPrerequisites() : { available: true, issues: [] };
     if (!geminiCheck.available) {
       const geminiTasks = readyTasks.filter((t) => t.assignee === "gemini");
       if (geminiTasks.length > 0) {
@@ -2375,6 +2379,14 @@ async function main() {
         console.error(
           `Task ${taskId ?? "(idle)"} timed out and exceeded max task retries (${maxTaskRetries}). Marking as failed and moving on. — consider breaking the task into smaller subtasks in dev/task.json or increasing timeout in .autopilot/config.json`
         );
+        if (taskId) {
+          const allTasks = readJson("dev/task.json", { tasks: [] });
+          const failedTask = (allTasks.tasks ?? []).find((t) => t.id === taskId);
+          if (failedTask) {
+            failedTask.status = "failed";
+            writeJson("dev/task.json", allTasks);
+          }
+        }
         notify("task_failed", {
           task_id: taskId ?? "idle",
           error: result.failureHint ?? "timeout",
