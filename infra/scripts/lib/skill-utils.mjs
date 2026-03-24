@@ -29,15 +29,27 @@ export function checkCircularDependencies(registry) {
     }
   }
 
-  function hasCycle(skillId, visited = new Set()) {
-    if (visited.has(skillId)) {
-      return true;
+  // Use WHITE/GRAY/BLACK coloring: visited = fully processed (BLACK), inStack = currently on path (GRAY)
+  const visited = new Set();
+  const inStack = new Set();
+
+  function hasCycle(skillId) {
+    if (inStack.has(skillId)) {
+      return true; // back-edge — real cycle
     }
-    visited.add(skillId);
+    if (visited.has(skillId)) {
+      return false; // already fully processed — no cycle via this node
+    }
+    inStack.add(skillId);
     const dep = allSkills[skillId];
     if (dep && allSkills[dep]) {
-      return hasCycle(dep, visited);
+      if (hasCycle(dep)) {
+        inStack.delete(skillId);
+        return true;
+      }
     }
+    inStack.delete(skillId);
+    visited.add(skillId);
     return false;
   }
 

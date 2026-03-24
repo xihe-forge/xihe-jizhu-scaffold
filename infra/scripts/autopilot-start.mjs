@@ -259,7 +259,11 @@ function ensureCleanWorkingTree(taskId, taskName) {
     if (!status) return; // already clean
 
     // Auto-stage and commit uncommitted changes (using spawnSync to avoid shell injection)
-    spawnSync("git", ["add", "-A"], { timeout: 10000, stdio: "pipe" });
+    const addResult = spawnSync("git", ["add", "-A"], { timeout: 10000, stdio: "pipe" });
+    if (addResult.status !== 0) {
+      console.warn(`⚠ Auto-commit skipped after task ${taskId}: git add failed — manual commit may be needed`);
+      return;
+    }
     const msg = `chore: auto-commit after task ${taskId} — ${taskName}`;
     const commitResult = spawnSync("git", ["commit", "-m", msg], { encoding: "utf8", timeout: 30000, stdio: "pipe" });
     if (commitResult.status !== 0) throw new Error(commitResult.stderr || "git commit failed");
@@ -276,7 +280,7 @@ function ensureCleanWorkingTree(taskId, taskName) {
  */
 function pushToRemote() {
   try {
-    const remote = execSync("git remote", { encoding: "utf8", timeout: 5000 }).trim().split("\n")[0];
+    const remote = execSync("git remote", { encoding: "utf8", timeout: 5000 }).trim().split(/\r?\n/)[0];
     if (!remote) return;
     const branch = getCurrentBranch();
     if (branch === "unknown") return;
@@ -294,6 +298,7 @@ function getTaskProgressSummary() {
   const tasks = getTasks();
   return {
     done: tasks.filter((task) => task.status === "done").length,
+    skipped: tasks.filter((task) => task.status === "skipped").length,
     total: tasks.length
   };
 }
@@ -576,13 +581,11 @@ function checkGeminiPrerequisites() {
     issues.push("gemini-bridge/GeminiBridge.psm1 not found");
   }
   // Check gemini CLI availability
-  try {
-    const result = execSync("gemini --version", { timeout: 10000, stdio: "pipe", shell: process.platform === "win32" });
-    if (!result || !result.toString().trim()) {
-      issues.push("gemini CLI found but returned empty version");
-    }
-  } catch {
+  const geminiVersionResult = spawnSync("gemini", ["--version"], { stdio: "pipe", timeout: 5000 });
+  if (geminiVersionResult.status !== 0 || geminiVersionResult.error) {
     issues.push("gemini CLI not found or not executable (install with: npm install -g @google/gemini-cli)");
+  } else if (!geminiVersionResult.stdout || !geminiVersionResult.stdout.toString().trim()) {
+    issues.push("gemini CLI found but returned empty version");
   }
   return { available: issues.length === 0, issues };
 }
@@ -722,7 +725,10 @@ function topoSortSkills(skillIds, registry) {
 
   function visit(id) {
     if (visited.has(id)) return;
-    if (inProgress.has(id)) return; // cycle guard — skip to avoid infinite loop
+    if (inProgress.has(id)) {
+      console.warn(`[skills] Circular dependency detected involving skill: ${id}`);
+      return; // cycle guard — skip to avoid infinite loop
+    }
     inProgress.add(id);
     const dep = depMap.get(id);
     if (dep && skillIds.includes(dep)) {
@@ -2417,7 +2423,7 @@ async function main() {
       const finalSummary = getTaskProgressSummary();
 
       if (readyCheck.length === 0) {
-        if (finalSummary.done >= finalSummary.total && finalSummary.total > 0) {
+        if (finalSummary.done + finalSummary.skipped >= finalSummary.total && finalSummary.total > 0) {
           // --- Final Iteration Review Phase ---
           const planConfig = readJson(".planning/config.json", {});
           const finalReviewEnabled = planConfig?.final_review?.enabled ?? false;

@@ -30,7 +30,13 @@ function collectFiles(dir, collected = []) {
   if (!existsSync(dir)) return collected;
   for (const entry of readdirSync(dir)) {
     const full = path.join(dir, entry);
-    if (statSync(full).isDirectory()) {
+    let stat;
+    try {
+      stat = statSync(full);
+    } catch {
+      continue; // file removed between readdirSync and statSync — skip it
+    }
+    if (stat.isDirectory()) {
       collectFiles(full, collected);
     } else {
       collected.push(full);
