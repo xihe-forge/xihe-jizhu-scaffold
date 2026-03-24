@@ -1,5 +1,5 @@
 export type TaskPriority = "P0" | "P1" | "P2";
-export type TaskStatus = "todo" | "in_progress" | "done" | "blocked" | "skipped";
+export type TaskStatus = "todo" | "in_progress" | "done" | "blocked" | "skipped" | "failed";
 export type TaskType =
   | "planning"
   | "research"

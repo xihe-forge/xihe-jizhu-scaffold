@@ -303,6 +303,7 @@ function getTaskProgressSummary() {
   return {
     done: tasks.filter((task) => task.status === "done").length,
     skipped: tasks.filter((task) => task.status === "skipped").length,
+    failed: tasks.filter((task) => task.status === "failed").length,
     total: tasks.length
   };
 }
@@ -1894,7 +1895,8 @@ async function invokeRunner({ prompt, model, config, state, taskId, allowResumeF
     clearTimeout(sigkillTimer);
   }
   clearInterval(heartbeat);
-  logStream.end();
+  await new Promise((resolve) => { logStream.end(resolve); })
+    .catch(() => { /* log file is best-effort */ });
   await new Promise((resolve, reject) => {
     outputStream.on("finish", resolve);
     outputStream.on("error", reject);
@@ -2435,7 +2437,7 @@ async function main() {
       const finalSummary = getTaskProgressSummary();
 
       if (readyCheck.length === 0) {
-        if (finalSummary.done + finalSummary.skipped >= finalSummary.total && finalSummary.total > 0) {
+        if (finalSummary.done + finalSummary.skipped + finalSummary.failed >= finalSummary.total && finalSummary.total > 0) {
           // --- Final Iteration Review Phase ---
           const planConfig = readJson(".planning/config.json", {});
           const finalReviewEnabled = planConfig?.final_review?.enabled ?? false;

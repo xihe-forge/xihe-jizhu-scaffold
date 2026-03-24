@@ -431,7 +431,9 @@ if (config?.optional_modules?.payment?.enabled) {
     const dirPath = path.join(root, dir);
     const filesToCheck = [];
     const collectFiles = (d) => {
-      for (const entry of readdirSync(d, { withFileTypes: true })) {
+      let entries;
+      try { entries = readdirSync(d, { withFileTypes: true }); } catch { return; }
+      for (const entry of entries) {
         const full = path.join(d, entry.name);
         if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
           collectFiles(full);

@@ -23,5 +23,4 @@ The scaffold is feature-complete and in use for production projects. Current foc
 ## Open Decisions
 
 - Whether to add more project templates (e.g., chrome-extension, mobile)
-- Gemini CLI profile not yet in `.autopilot/config.json` (bridge exists but runtime profile pending)
 - Skill module versioning strategy (currently uses git submodule HEAD)
