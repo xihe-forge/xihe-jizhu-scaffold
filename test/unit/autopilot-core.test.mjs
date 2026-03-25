@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -1886,5 +1886,147 @@ describe("getCurrentBranch", () => {
     // Verify function exists — it calls real git, so only check signature
     assert.equal(typeof getCurrentBranch, "function");
     assert.equal(getCurrentBranch.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// architecture boundary — enforce layering rules
+// ---------------------------------------------------------------------------
+
+describe("architecture boundary", () => {
+  // readFileSync is already imported at the top of this file;
+  // readdirSync is added here via a separate destructured import at module level below.
+  // Resolve infra/scripts/lib and packages paths from the scaffold root
+  const libDir = path.join(scaffoldRoot, "infra", "scripts", "lib");
+  const packagesDir = path.join(scaffoldRoot, "packages");
+  const codexBridgeDir = path.join(scaffoldRoot, "codex-bridge");
+  const geminiBridgeDir = path.join(scaffoldRoot, "gemini-bridge");
+
+  /**
+   * Recursively collect all files matching an extension within a directory.
+   */
+  function collectFiles(dir, ext) {
+    const results = [];
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return results; // directory absent — nothing to check
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...collectFiles(full, ext));
+      } else if (entry.isFile() && entry.name.endsWith(ext)) {
+        results.push(full);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Read a file and return its lines (tolerates read errors).
+   */
+  function readLines(filePath) {
+    try {
+      return readFileSync(filePath, "utf8").split(/\r?\n/);
+    } catch {
+      return [];
+    }
+  }
+
+  // Rule 1: lib/ must NOT reverse-import scripts/ (i.e. `from "../<non-lib>..."`)
+  //
+  // `from "../lib/xxx.mjs"` is allowed (lib-internal cross-reference).
+  // Anything matching `from "../` that is NOT followed by `lib/` is forbidden.
+  it("lib/ files do not import from parent scripts/ layer", () => {
+    const libFiles = collectFiles(libDir, ".mjs");
+    const violations = [];
+
+    for (const file of libFiles) {
+      const lines = readLines(file);
+      lines.forEach((line, idx) => {
+        // Match: from "../  followed by anything that is NOT "lib/"
+        // e.g.  from "../autopilot-start.mjs"  → violation
+        //       from "../lib/utils.mjs"          → allowed
+        if (/from\s+["']\.\.\/(?!lib\/)/.test(line)) {
+          violations.push(`${path.relative(scaffoldRoot, file)}:${idx + 1}  ${line.trim()}`);
+        }
+      });
+    }
+
+    assert.deepEqual(
+      violations,
+      [],
+      `lib/ must not reverse-import scripts/ layer.\nViolations:\n${violations.join("\n")}`
+    );
+  });
+
+  // Rule 2: packages/ must NOT import apps/ or infra/
+  it("packages/ files do not import from apps/ or infra/", () => {
+    // Collect .ts, .mjs, .js source files (exclude dist/ and .turbo/)
+    const allPackageFiles = collectFiles(packagesDir, ".ts")
+      .concat(collectFiles(packagesDir, ".mjs"))
+      .concat(collectFiles(packagesDir, ".js"))
+      .filter((f) => !f.includes(`${path.sep}dist${path.sep}`) && !f.includes(`${path.sep}.turbo${path.sep}`));
+
+    const violations = [];
+
+    for (const file of allPackageFiles) {
+      const lines = readLines(file);
+      lines.forEach((line, idx) => {
+        // Detect any import/require referencing apps/ or infra/
+        if (/(?:from|require)\s*\(?["'][^"']*\/(?:apps|infra)\//.test(line)) {
+          violations.push(`${path.relative(scaffoldRoot, file)}:${idx + 1}  ${line.trim()}`);
+        }
+      });
+    }
+
+    assert.deepEqual(
+      violations,
+      [],
+      `packages/ must not import from apps/ or infra/.\nViolations:\n${violations.join("\n")}`
+    );
+  });
+
+  // Rule 3: bridge modules must be independent — .ps1 files must not reference infra/scripts/
+  it("codex-bridge .ps1 files do not reference infra/scripts/ paths", () => {
+    const ps1Files = collectFiles(codexBridgeDir, ".ps1");
+    const violations = [];
+
+    for (const file of ps1Files) {
+      const lines = readLines(file);
+      lines.forEach((line, idx) => {
+        if (/infra[/\\]scripts[/\\]/.test(line)) {
+          violations.push(`${path.relative(scaffoldRoot, file)}:${idx + 1}  ${line.trim()}`);
+        }
+      });
+    }
+
+    assert.deepEqual(
+      violations,
+      [],
+      `codex-bridge .ps1 must not reference infra/scripts/.\nViolations:\n${violations.join("\n")}`
+    );
+  });
+
+  it("gemini-bridge .ps1 files do not reference infra/scripts/ paths", () => {
+    const ps1Files = collectFiles(geminiBridgeDir, ".ps1");
+    const violations = [];
+
+    for (const file of ps1Files) {
+      const lines = readLines(file);
+      lines.forEach((line, idx) => {
+        if (/infra[/\\]scripts[/\\]/.test(line)) {
+          violations.push(`${path.relative(scaffoldRoot, file)}:${idx + 1}  ${line.trim()}`);
+        }
+      });
+    }
+
+    assert.deepEqual(
+      violations,
+      [],
+      `gemini-bridge .ps1 must not reference infra/scripts/.\nViolations:\n${violations.join("\n")}`
+    );
   });
 });

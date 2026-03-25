@@ -227,6 +227,28 @@ function getProgressTail() {
 }
 
 /**
+ * Scan agent output for potentially dangerous operations.
+ * Returns an array of matched pattern descriptions, empty if clean.
+ */
+function scanForDangerousOperations(output) {
+  if (!output) return [];
+  const patterns = [
+    { pattern: /rm\s+-rf\s+\/(?!tmp)/g, desc: "recursive delete outside /tmp" },
+    { pattern: /DROP\s+(?:TABLE|DATABASE)/gi, desc: "database destructive operation" },
+    { pattern: /--force\s+push|push\s+--force|push\s+-f\b/gi, desc: "force push" },
+    { pattern: /git\s+reset\s+--hard/gi, desc: "hard reset" },
+    { pattern: /process\.env\.\w+.*=.*['"][A-Za-z0-9_\-]{20,}['"]/g, desc: "possible hardcoded secret assignment" },
+  ];
+  const matches = [];
+  for (const { pattern, desc } of patterns) {
+    if (pattern.test(output)) {
+      matches.push(desc);
+    }
+  }
+  return matches;
+}
+
+/**
  * Parse the completion status protocol line from agent output.
  * Agents should emit a STATUS: line as one of the last 20 lines of output.
  * Recognized statuses: DONE, DONE_WITH_CONCERNS, BLOCKED, NEEDS_CONTEXT.
@@ -2302,6 +2324,11 @@ async function main() {
       if (!completionStatus.raw) {
         console.warn("⚠ Agent did not emit completion status — treating as DONE");
       }
+      const dangerousOps = scanForDangerousOperations(agentOutput);
+      if (dangerousOps.length > 0) {
+        console.warn(`⚠ Dangerous operations detected in agent output: ${dangerousOps.join(", ")}`);
+        appendProgressEntry(`[WARNING] Round ${round}: dangerous operations detected — ${dangerousOps.join(", ")}`);
+      }
       if (completionStatus.status === "BLOCKED") {
         console.error(`Task blocked: ${completionStatus.details} — check task dependencies in dev/task.json or reassign blocked tasks`);
         // Mark the task as "blocked" in task.json so it won't be picked again
@@ -2723,4 +2750,4 @@ if (isDirectRun) {
 }
 
 // Export for testing
-export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds, loadSkillInstructions, getSkillExecutionOrder, topoSortSkills, recordTaskMetrics, checkGeminiPrerequisites, buildGeminiDelegationBlock, parseCompletionStatus, ensureCleanWorkingTree, pushToRemote };
+export { getTasks, getReadyTasks, getNextTask, getTaskProgressSummary, detectFailureCategory, tryParseStructuredError, detectFailureCategoryFromText, resolveModel, buildPrompt, buildReviewGateInstructions, buildFinalReviewPrompt, computeMaxReviewRounds, loadSkillInstructions, getSkillExecutionOrder, topoSortSkills, recordTaskMetrics, checkGeminiPrerequisites, buildGeminiDelegationBlock, parseCompletionStatus, ensureCleanWorkingTree, pushToRemote, scanForDangerousOperations };
