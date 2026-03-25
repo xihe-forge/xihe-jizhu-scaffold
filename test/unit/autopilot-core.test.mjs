@@ -27,6 +27,15 @@ import {
 } from "../../infra/scripts/autopilot-start.mjs";
 
 import {
+  loadMemory,
+  saveMemory,
+  extractMemoryFromOutput,
+  updateMemory,
+  formatMemoryForPrompt,
+  recordTaskOutcome
+} from "../../infra/scripts/lib/memory.mjs";
+
+import {
   isWorkingTreeClean,
   getCurrentBranch
 } from "../../infra/scripts/lib/utils.mjs";
@@ -2028,5 +2037,357 @@ describe("architecture boundary", () => {
       [],
       `gemini-bridge .ps1 must not reference infra/scripts/.\nViolations:\n${violations.join("\n")}`
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// memory system
+// ---------------------------------------------------------------------------
+
+describe("memory system", () => {
+  // -------------------------------------------------------------------------
+  // loadMemory
+  // -------------------------------------------------------------------------
+
+  describe("loadMemory", () => {
+    it("returns default structure when memory file does not exist", () => {
+      // loadMemory reads .autopilot/memory.json relative to cwd.
+      // We cannot control whether it exists in the test environment, but if
+      // absent it must return the canonical empty shape.
+      const memory = loadMemory();
+      assert.ok(typeof memory === "object", "should return an object");
+      assert.ok(typeof memory.version === "string", "should have version string");
+      assert.ok(Array.isArray(memory.projectDecisions), "projectDecisions should be array");
+      assert.ok(Array.isArray(memory.executionPatterns), "executionPatterns should be array");
+      assert.ok(Array.isArray(memory.taskNotes), "taskNotes should be array");
+    });
+
+    it("returns all required keys regardless of file presence", () => {
+      const memory = loadMemory();
+      const keys = ["version", "lastUpdated", "projectDecisions", "executionPatterns", "taskNotes"];
+      for (const key of keys) {
+        assert.ok(Object.prototype.hasOwnProperty.call(memory, key), `memory should have '${key}' key`);
+      }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // extractMemoryFromOutput
+  // -------------------------------------------------------------------------
+
+  describe("extractMemoryFromOutput", () => {
+    it("extracts DECISION: lines", () => {
+      const output = "Some work\nDECISION: Use zustand instead of Redux\nMore work";
+      const result = extractMemoryFromOutput(output, "T003", 5);
+      assert.equal(result.decisions.length, 1);
+      assert.equal(result.decisions[0].content, "Use zustand instead of Redux");
+      assert.equal(result.decisions[0].source, "T003");
+      assert.equal(result.decisions[0].round, 5);
+    });
+
+    it("extracts NOTE: lines", () => {
+      const output = "Testing...\nNOTE: Run npm install before tests\nDone";
+      const result = extractMemoryFromOutput(output, "T007", 12);
+      assert.equal(result.notes.length, 1);
+      assert.equal(result.notes[0].content, "Run npm install before tests");
+      assert.equal(result.notes[0].taskId, "T007");
+      assert.equal(result.notes[0].round, 12);
+    });
+
+    it("extracts Chinese 决策: lines", () => {
+      const output = "工作中\n决策: 使用zustand而非Redux\n完成";
+      const result = extractMemoryFromOutput(output, "T003", 5);
+      assert.equal(result.decisions.length, 1);
+      assert.equal(result.decisions[0].content, "使用zustand而非Redux");
+    });
+
+    it("extracts Chinese 注意: lines", () => {
+      const output = "测试中\n注意: 先安装依赖再跑测试\n完成";
+      const result = extractMemoryFromOutput(output, "T007", 12);
+      assert.equal(result.notes.length, 1);
+      assert.equal(result.notes[0].content, "先安装依赖再跑测试");
+    });
+
+    it("detects timeout pattern and generates execution pattern", () => {
+      const output = "Attempting task...\nProcess timed out after 60s\nFailed";
+      const result = extractMemoryFromOutput(output, "T005", 3);
+      assert.ok(result.patterns.length > 0, "should detect timeout pattern");
+      assert.ok(result.patterns[0].content.includes("T005"), "pattern should mention task ID");
+    });
+
+    it("detects 'timeout' keyword variant", () => {
+      const output = "Error: timeout connecting to server";
+      const result = extractMemoryFromOutput(output, "T002", 1);
+      assert.ok(result.patterns.length > 0, "should detect timeout keyword");
+    });
+
+    it("returns empty arrays for null/empty output", () => {
+      const r1 = extractMemoryFromOutput(null, "T001", 1);
+      assert.equal(r1.decisions.length, 0);
+      assert.equal(r1.patterns.length, 0);
+      assert.equal(r1.notes.length, 0);
+
+      const r2 = extractMemoryFromOutput("", "T001", 1);
+      assert.equal(r2.decisions.length, 0);
+      assert.equal(r2.patterns.length, 0);
+      assert.equal(r2.notes.length, 0);
+    });
+
+    it("extracts multiple DECISION and NOTE lines from one output", () => {
+      const output = [
+        "Starting work",
+        "DECISION: Use TypeScript strict mode",
+        "NOTE: Install @types/node first",
+        "DECISION: Prefer pnpm over npm",
+        "NOTE: Run tsc before committing",
+        "Done"
+      ].join("\n");
+      const result = extractMemoryFromOutput(output, "T010", 2);
+      assert.equal(result.decisions.length, 2);
+      assert.equal(result.notes.length, 2);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // updateMemory
+  // -------------------------------------------------------------------------
+
+  describe("updateMemory", () => {
+    it("adds new items to memory", () => {
+      const memory = {
+        version: "1.0",
+        lastUpdated: new Date().toISOString(),
+        projectDecisions: [],
+        executionPatterns: [],
+        taskNotes: [],
+        _agentStats: {}
+      };
+      const extracted = {
+        decisions: [{ content: "Use zustand", source: "T003", round: 1, createdAt: new Date().toISOString() }],
+        patterns: [],
+        notes: []
+      };
+      const updated = updateMemory(memory, extracted);
+      assert.equal(updated.projectDecisions.length, 1);
+      assert.equal(updated.projectDecisions[0].content, "Use zustand");
+      assert.ok(updated.projectDecisions[0].id, "should assign an id");
+    });
+
+    it("deduplicates items with identical content", () => {
+      const now = new Date().toISOString();
+      const existingDecision = { id: "dec_001", content: "Use zustand", source: "T003", round: 1, createdAt: now };
+      const memory = {
+        version: "1.0",
+        lastUpdated: now,
+        projectDecisions: [existingDecision],
+        executionPatterns: [],
+        taskNotes: [],
+        _agentStats: {}
+      };
+      const extracted = {
+        decisions: [{ content: "Use zustand", source: "T005", round: 2, createdAt: now }],
+        patterns: [],
+        notes: []
+      };
+      const updated = updateMemory(memory, extracted);
+      assert.equal(updated.projectDecisions.length, 1, "duplicate should not be added");
+    });
+
+    it("trims to MAX_MEMORY_ITEMS (50) when exceeded", () => {
+      const now = new Date().toISOString();
+      // Create 50 existing decisions
+      const existingDecisions = Array.from({ length: 50 }, (_, i) => ({
+        id: `dec_${String(i + 1).padStart(3, "0")}`,
+        content: `Decision ${i + 1}`,
+        source: "T001",
+        round: i + 1,
+        createdAt: now
+      }));
+      const memory = {
+        version: "1.0",
+        lastUpdated: now,
+        projectDecisions: existingDecisions,
+        executionPatterns: [],
+        taskNotes: [],
+        _agentStats: {}
+      };
+      const extracted = {
+        decisions: [{ content: "New decision that pushes over limit", source: "T099", round: 51, createdAt: now }],
+        patterns: [],
+        notes: []
+      };
+      const updated = updateMemory(memory, extracted);
+      assert.equal(updated.projectDecisions.length, 50, "should trim to MAX_MEMORY_ITEMS");
+      // The newest item should be last (oldest was removed from front)
+      const last = updated.projectDecisions[updated.projectDecisions.length - 1];
+      assert.equal(last.content, "New decision that pushes over limit");
+    });
+
+    it("handles empty extracted object gracefully", () => {
+      const memory = {
+        version: "1.0",
+        lastUpdated: new Date().toISOString(),
+        projectDecisions: [],
+        executionPatterns: [],
+        taskNotes: [],
+        _agentStats: {}
+      };
+      assert.doesNotThrow(() => updateMemory(memory, {}));
+      assert.doesNotThrow(() => updateMemory(memory, { decisions: [], patterns: [], notes: [] }));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // formatMemoryForPrompt
+  // -------------------------------------------------------------------------
+
+  describe("formatMemoryForPrompt", () => {
+    it("returns empty string when all categories are empty", () => {
+      const memory = {
+        projectDecisions: [],
+        executionPatterns: [],
+        taskNotes: []
+      };
+      assert.equal(formatMemoryForPrompt(memory), "");
+    });
+
+    it("includes project decisions section when decisions exist", () => {
+      const memory = {
+        projectDecisions: [{ id: "dec_001", content: "Use zustand", source: "T003", round: 1, createdAt: "" }],
+        executionPatterns: [],
+        taskNotes: []
+      };
+      const output = formatMemoryForPrompt(memory);
+      assert.ok(output.includes("<project_memory>"), "should include opening tag");
+      assert.ok(output.includes("</project_memory>"), "should include closing tag");
+      assert.ok(output.includes("## Project Decisions"), "should include decisions header");
+      assert.ok(output.includes("Use zustand"), "should include decision content");
+      assert.ok(output.includes("[T003]"), "should include source tag");
+    });
+
+    it("includes execution patterns section when patterns exist", () => {
+      const memory = {
+        projectDecisions: [],
+        executionPatterns: [{ id: "pat_001", content: "codex has high timeout rate", confidence: 0.8, createdAt: "" }],
+        taskNotes: []
+      };
+      const output = formatMemoryForPrompt(memory);
+      assert.ok(output.includes("## Execution Patterns"), "should include patterns header");
+      assert.ok(output.includes("codex has high timeout rate"), "should include pattern content");
+    });
+
+    it("includes task notes section when notes exist", () => {
+      const memory = {
+        projectDecisions: [],
+        executionPatterns: [],
+        taskNotes: [{ id: "note_001", taskId: "T007", content: "Install deps first", round: 12, createdAt: "" }]
+      };
+      const output = formatMemoryForPrompt(memory);
+      assert.ok(output.includes("## Recent Task Notes"), "should include notes header");
+      assert.ok(output.includes("[T007]"), "should include task tag");
+      assert.ok(output.includes("Install deps first"), "should include note content");
+    });
+
+    it("wraps output in <project_memory> tags", () => {
+      const memory = {
+        projectDecisions: [{ id: "dec_001", content: "Some decision", source: "T001", round: 1, createdAt: "" }],
+        executionPatterns: [],
+        taskNotes: []
+      };
+      const output = formatMemoryForPrompt(memory);
+      assert.ok(output.startsWith("<project_memory>"), "should start with opening tag");
+      assert.ok(output.endsWith("</project_memory>"), "should end with closing tag");
+    });
+
+    it("omits sections that have no entries", () => {
+      const memory = {
+        projectDecisions: [{ id: "dec_001", content: "Only decisions", source: "T001", round: 1, createdAt: "" }],
+        executionPatterns: [],
+        taskNotes: []
+      };
+      const output = formatMemoryForPrompt(memory);
+      assert.ok(!output.includes("## Execution Patterns"), "should omit empty patterns section");
+      assert.ok(!output.includes("## Recent Task Notes"), "should omit empty notes section");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // recordTaskOutcome
+  // -------------------------------------------------------------------------
+
+  describe("recordTaskOutcome", () => {
+    function freshMemory() {
+      return {
+        version: "1.0",
+        lastUpdated: new Date().toISOString(),
+        projectDecisions: [],
+        executionPatterns: [],
+        taskNotes: [],
+        _agentStats: {}
+      };
+    }
+
+    it("tracks success outcomes for an assignee", () => {
+      let memory = freshMemory();
+      memory = recordTaskOutcome(memory, "T001", "sonnet", "success", 5000);
+      assert.equal(memory._agentStats.sonnet.success, 1);
+      assert.equal(memory._agentStats.sonnet.consecutiveFailures, 0);
+    });
+
+    it("tracks failure outcomes and increments consecutiveFailures", () => {
+      let memory = freshMemory();
+      memory = recordTaskOutcome(memory, "T001", "codex", "failure", 10000);
+      assert.equal(memory._agentStats.codex.failure, 1);
+      assert.equal(memory._agentStats.codex.consecutiveFailures, 1);
+    });
+
+    it("tracks timeout outcomes and increments consecutiveFailures", () => {
+      let memory = freshMemory();
+      memory = recordTaskOutcome(memory, "T001", "codex", "timeout", 60000);
+      assert.equal(memory._agentStats.codex.timeout, 1);
+      assert.equal(memory._agentStats.codex.consecutiveFailures, 1);
+    });
+
+    it("resets consecutiveFailures to 0 on success", () => {
+      let memory = freshMemory();
+      memory = recordTaskOutcome(memory, "T001", "codex", "failure", 10000);
+      memory = recordTaskOutcome(memory, "T002", "codex", "failure", 10000);
+      memory = recordTaskOutcome(memory, "T003", "codex", "success", 8000);
+      assert.equal(memory._agentStats.codex.consecutiveFailures, 0);
+    });
+
+    it("auto-generates execution pattern after 3 consecutive failures", () => {
+      let memory = freshMemory();
+      memory = recordTaskOutcome(memory, "T001", "codex", "failure", 10000);
+      memory = recordTaskOutcome(memory, "T002", "codex", "failure", 10000);
+      assert.equal(memory.executionPatterns.length, 0, "no pattern before 3 failures");
+      memory = recordTaskOutcome(memory, "T003", "codex", "failure", 10000);
+      assert.ok(memory.executionPatterns.length > 0, "should add pattern after 3 failures");
+      assert.ok(memory.executionPatterns[0].content.includes("codex"), "pattern should mention assignee");
+    });
+
+    it("does not duplicate the pattern on further failures after 3", () => {
+      let memory = freshMemory();
+      memory = recordTaskOutcome(memory, "T001", "codex", "failure", 10000);
+      memory = recordTaskOutcome(memory, "T002", "codex", "failure", 10000);
+      memory = recordTaskOutcome(memory, "T003", "codex", "failure", 10000);
+      memory = recordTaskOutcome(memory, "T004", "codex", "failure", 10000);
+      const codexPatterns = memory.executionPatterns.filter((p) => p.content.includes("codex"));
+      assert.equal(codexPatterns.length, 1, "should not duplicate pattern");
+    });
+
+    it("handles null/undefined assignee gracefully", () => {
+      const memory = freshMemory();
+      assert.doesNotThrow(() => recordTaskOutcome(memory, "T001", null, "failure", 1000));
+      assert.doesNotThrow(() => recordTaskOutcome(memory, "T001", undefined, "failure", 1000));
+    });
+
+    it("tracks multiple different assignees independently", () => {
+      let memory = freshMemory();
+      memory = recordTaskOutcome(memory, "T001", "sonnet", "success", 5000);
+      memory = recordTaskOutcome(memory, "T002", "codex", "failure", 10000);
+      assert.equal(memory._agentStats.sonnet.success, 1);
+      assert.equal(memory._agentStats.codex.failure, 1);
+    });
   });
 });
