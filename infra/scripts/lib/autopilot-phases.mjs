@@ -97,13 +97,13 @@ export async function handleUnavailableRunners(
  *           notify: Function, formatDuration: Function, readJson: Function,
  *           writeJson: Function, loadState: Function, saveState: Function,
  *           runOnce: boolean }} fns
- * @param {{ task: object, result: object, taskDurationMs: number }} ctx
+ * @param {{ task: object, result: object, taskDurationMs: number, round: number }} ctx
  * @returns {{ action: "continue" | "break" | "stop" }}
  */
 export function handleSuccessResult(
   { parseCompletionStatus, scanForDangerousOperations, appendProgressEntry, ensureCleanWorkingTree,
     notify, formatDuration, readJson, writeJson, loadState, saveState, runOnce },
-  { task, result, taskDurationMs }
+  { task, result, taskDurationMs, round }
 ) {
   let agentOutput = "";
   try {
@@ -120,7 +120,6 @@ export function handleSuccessResult(
   const dangerousOps = scanForDangerousOperations(agentOutput);
   if (dangerousOps.length > 0) {
     console.warn(`⚠ Dangerous operations detected in agent output: ${dangerousOps.join(", ")}`);
-    // eslint-disable-next-line no-undef
     appendProgressEntry(`[WARNING] Round ${round}: dangerous operations detected — ${dangerousOps.join(", ")}`);
   }
 
@@ -140,7 +139,7 @@ export function handleSuccessResult(
       lastFailureCategory: "blocked",
       lastFailureHint: completionStatus.details
     });
-    return { action: "continue" };
+    return { action: "continue", status: "BLOCKED" };
   }
 
   if (completionStatus.status === "NEEDS_CONTEXT") {
@@ -158,7 +157,7 @@ export function handleSuccessResult(
       reason: "needs_context",
       details: completionStatus.details
     }).catch?.(() => {});
-    return { action: "break" };
+    return { action: "break", status: "NEEDS_CONTEXT" };
   }
 
   if (completionStatus.status === "DONE_WITH_CONCERNS") {
@@ -175,7 +174,7 @@ export function handleSuccessResult(
   // Post-task git safety net: auto-commit any uncommitted changes
   ensureCleanWorkingTree(task.id, task.name);
 
-  return { action: "proceed" };
+  return { action: "proceed", status: completionStatus.status };
 }
 
 // ---------------------------------------------------------------------------
@@ -260,12 +259,13 @@ export function handleTimeoutResult(
  * Handles the wait logic after a failed invocation (quota or other).
  *
  * @param {{ waitForRetry: Function, waitWithCountdown: Function,
- *           loadState: Function, saveState: Function }} fns
+ *           loadState: Function, saveState: Function,
+ *           formatDuration: Function, notify: Function }} fns
  * @param {{ result: object, config: object }} ctx
  * @returns {{ action: "continue" | "break" }}
  */
 export async function handleFailureWait(
-  { waitForRetry, waitWithCountdown, loadState, saveState },
+  { waitForRetry, waitWithCountdown, loadState, saveState, formatDuration, notify },
   { result, config }
 ) {
   if (result.failureCategory === "quota") {
@@ -417,7 +417,7 @@ export async function runFinalReviewPhase(
   { invokeRunner, recordTaskMetrics, getTasks, buildFinalReviewPrompt,
     computeMaxReviewRounds, countSourceFiles, checkCodexPrerequisites,
     checkGeminiPrerequisites, renderRunnerSummary, notify,
-    waitForRetry, waitWithCountdown, readText,
+    waitForRetry, waitWithCountdown, readJson, readText,
     loadState, saveState, pushToRemote, runOnce },
   { config, finalSummary, metricsSessionId, metricsSessionStartedAt }
 ) {
@@ -505,8 +505,7 @@ export async function runFinalReviewPhase(
   saveState({
     ...loadState(),
     status: "final_review",
-    finalReviewRound: reviewRound,
-    round: (loadState().round ?? 0) + 1
+    finalReviewRound: reviewRound
   });
 
   console.log(`Runner: ${renderRunnerSummary(config)}`);
@@ -554,6 +553,8 @@ export async function runFinalReviewPhase(
         }
       }
 
+      // Review succeeded and created new tasks — only here do we advance the round counter
+      saveState({ ...loadState(), round: (loadState().round ?? 0) + 1 });
       console.log(`Review round ${reviewRound} created ${newTodoTasks.length} fix task(s). Executing fixes before next review.`);
       if (runOnce) return { action: "break" };
       return { action: "continue" };

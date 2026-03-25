@@ -26,6 +26,17 @@ AI agents MUST read this file before every round of work.
 8. Update `dev/task.json`, `dev/progress.txt`, and `.planning/STATE.md`
 9. Git commit all changes together
 
+### Memory Markers
+
+Agent output is scanned for memory markers that persist project knowledge across sessions:
+
+- **`DECISION: xxx`** — Extracted as a project decision and stored in `.autopilot/memory.json`. Use this when making a significant technical or product decision (e.g., `DECISION: Use PostgreSQL over SQLite for multi-user concurrency`).
+- **`NOTE: xxx`** — Extracted as a task note and stored in `.autopilot/memory.json`. Use this for observations or context that may help future rounds (e.g., `NOTE: The auth module depends on an unstable upstream API`).
+
+These memories are automatically injected into agent prompts in subsequent rounds via a `<project_memory>` block, giving agents cross-session context without re-reading all artifacts.
+
+Agents are encouraged to output `DECISION:` lines whenever they make a choice that would otherwise be lost between sessions.
+
 ### Role Division: Opus vs Sonnet vs Codex
 
 The autopilot system uses a multi-agent model:

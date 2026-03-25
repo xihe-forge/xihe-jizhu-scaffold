@@ -7,7 +7,7 @@ The scaffold is feature-complete and in use for production projects. Current foc
 ## Completed Features
 
 - **Multi-AI autopilot orchestration** -- Opus orchestrates; Sonnet, Codex CLI, and Gemini CLI execute via worktree isolation
-- **163 unit tests across 26 test suites** -- covering autopilot core, intake, health checks, utils
+- **195 unit tests across 33 test suites** -- covering autopilot core, intake, health checks, utils
 - **Quota self-healing** -- dedicated `waiting_quota` state, does not consume retry budget; parses reset times when available
 - **codex-bridge & gemini-bridge** -- PowerShell modules for delegating tasks to Codex CLI and Gemini CLI
 - **Skill module system** -- impeccable (frontend anti-slop), vercel-web-design (engineering UX), xihe-search-forge (SEO/AEO); topological sort, phase mapping, skill registry
@@ -19,6 +19,10 @@ The scaffold is feature-complete and in use for production projects. Current foc
 - **CLI slash commands** -- generated from `.md.tmpl` templates; `/intake`, `/autopilot`, `/review`, `/design`, `/security`, `/deploy-check`, `/cost`, etc.
 - **Intake wizard with resume** -- one-click / standard / advanced modes; interrupted sessions resume from saved state
 - **Additive project adoption** -- `pnpm adopt` overlays planning layer without touching existing source
+- **Project memory system** -- `.autopilot/memory.json` records project decisions and execution patterns for cross-session continuity
+- **Autopilot phase extraction** -- `main()` refactored into testable named phase functions
+- **Architecture boundary tests** -- CI guards module boundaries to prevent coupling regressions
+- **Dangerous operation scanner** -- agent output safety scanning for destructive commands
 
 ## Open Decisions
 

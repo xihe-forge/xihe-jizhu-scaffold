@@ -11,6 +11,14 @@ This scaffold uses a monorepo layout:
 - `test/`
 - `infra/`
 
+## Layer 1.5: Autopilot Runtime
+
+The `.autopilot/` directory holds runtime configuration and persistent state:
+
+- Model selection and retry policy
+- Session state (survives process restarts)
+- `memory.json` — project memory store. Captures `DECISION:` and `NOTE:` markers from agent output and injects them into subsequent agent prompts via `<project_memory>` blocks, providing cross-session continuity.
+
 ## Layer 2: Durable Planning State
 
 The `.planning/` directory captures state that survives session resets:

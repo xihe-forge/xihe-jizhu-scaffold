@@ -2254,18 +2254,21 @@ async function main() {
         { parseCompletionStatus, scanForDangerousOperations, appendProgressEntry,
           ensureCleanWorkingTree, notify, formatDuration, readJson, writeJson,
           loadState, saveState, runOnce },
-        { task, result, taskDurationMs }
+        { task, result, taskDurationMs, round: loadState().round ?? 0 }
       );
 
       // Update project memory with extracted decisions/notes and outcome tracking
       try {
-        const memory = loadMemory();
-        const agentOutput = result.outputFile && existsSync(result.outputFile)
-          ? readFileSync(result.outputFile, "utf8") : "";
+        let memory = loadMemory();
+        const agentOutput = (() => {
+          try { return readFileSync(".autopilot/logs/assistant-output.log", "utf8"); } catch { return ""; }
+        })();
         const extracted = extractMemoryFromOutput(agentOutput, task.id, loadState().round ?? 0);
-        updateMemory(memory, extracted);
-        recordTaskOutcome(memory, task.id, task.assignee ?? "sonnet",
-          result.exitCode === 0 ? "success" : "failure", taskDurationMs);
+        memory = updateMemory(memory, extracted);
+        const memoryOutcome = successDecision.status === "BLOCKED" || successDecision.status === "NEEDS_CONTEXT"
+          ? "failure" : "success";
+        memory = recordTaskOutcome(memory, task.id, task.assignee ?? "sonnet",
+          memoryOutcome, taskDurationMs);
         saveMemory(memory);
       } catch { /* memory is best-effort */ }
 
@@ -2315,7 +2318,7 @@ async function main() {
             { invokeRunner, recordTaskMetrics, getTasks, buildFinalReviewPrompt,
               computeMaxReviewRounds, countSourceFiles, checkCodexPrerequisites,
               checkGeminiPrerequisites, renderRunnerSummary, notify,
-              waitForRetry, waitWithCountdown, readText,
+              waitForRetry, waitWithCountdown, readJson, readText,
               loadState, saveState, pushToRemote, runOnce },
             { config, finalSummary, metricsSessionId, metricsSessionStartedAt }
           );
@@ -2363,7 +2366,7 @@ async function main() {
     }
 
     const failureWaitResult = await handleFailureWait(
-      { waitForRetry, waitWithCountdown, loadState, saveState },
+      { waitForRetry, waitWithCountdown, loadState, saveState, formatDuration, notify },
       { result, config }
     );
     if (failureWaitResult.action === "break") break;

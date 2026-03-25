@@ -54,7 +54,7 @@ Got an existing project? `pnpm adopt` overlays the planning layer without touchi
 ```
 robust-ai-scaffold/
 ├── .planning/          # Durable planning state (PROJECT, REQUIREMENTS, ROADMAP, STATE, config.json)
-├── .autopilot/         # Runtime config and state (model selection, retry policy, session state)
+├── .autopilot/         # Runtime config and state (model selection, retry policy, session state, project memory)
 ├── .ai/
 │   ├── recipes/        # Agent playbooks (implement, review, diagnose, adopt, security-audit, etc.)
 │   ├── skills/         # External skill modules (impeccable, vercel-web-design)
@@ -64,9 +64,9 @@ robust-ai-scaffold/
 ├── packages/           # Shared code and types
 ├── docs/               # Research, MRD, PRD, tech specs, design docs
 ├── dev/                # task.json, progress.txt, metrics.json, bug fixes, review logs
-├── test/               # Unit tests (163 tests across 26 test suites)
+├── test/               # Unit tests (195 tests across 33 test suites)
 ├── infra/scripts/      # Autopilot engine, intake flow, health checks
-│   └── lib/            # Shared utilities (ai-runner, autopilot-runner, project-setup, utils, notifications, skill-utils)
+│   └── lib/            # Shared utilities (ai-runner, autopilot-phases, autopilot-runner, memory, project-setup, utils, notifications, skill-utils)
 ├── codex-bridge/       # PowerShell module for Codex CLI delegation
 ├── gemini-bridge/      # PowerShell module for Gemini CLI delegation
 ├── AGENTS.md           # Agent behavior rules (read before every round)
