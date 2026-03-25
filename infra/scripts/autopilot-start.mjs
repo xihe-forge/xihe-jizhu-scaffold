@@ -30,6 +30,23 @@ import {
   resolveRunnerProfile
 } from "./lib/autopilot-runner.mjs";
 import { notify } from "./lib/notifications.mjs";
+import {
+  filterTasksByAvailableRunners,
+  handleUnavailableRunners,
+  handleSuccessResult,
+  handleTimeoutResult,
+  handleFailureWait,
+  handleResumeDecision,
+  runFinalReviewPhase
+} from "./lib/autopilot-phases.mjs";
+import {
+  loadMemory,
+  saveMemory,
+  extractMemoryFromOutput,
+  updateMemory,
+  formatMemoryForPrompt,
+  recordTaskOutcome
+} from "./lib/memory.mjs";
 
 const args = process.argv.slice(2);
 const isDryRun = args.includes("--dry-run");
@@ -945,6 +962,12 @@ function buildPrompt(readyTasks, config) {
   const skillBlock = loadSkillInstructions(readyTasks, "implement");
   if (skillBlock) {
     sharedHeaderParts.push(skillBlock, "");
+  }
+
+  // Inject project memory (decisions, patterns, notes from prior rounds)
+  const memoryBlock = formatMemoryForPrompt(loadMemory());
+  if (memoryBlock) {
+    sharedHeaderParts.push(memoryBlock, "");
   }
 
   const sharedHeader = sharedHeaderParts.join("\n");
@@ -2084,72 +2107,15 @@ async function main() {
 
   // Handle user decision after review pause or task needing context
   if (state.status === "awaiting_user_decision") {
-    const pauseReason = state.needsContextDetails ? "needs_context" : "review_max_rounds";
-    if (pauseReason === "needs_context" && !acceptAsIs) {
-      if (continueReview) {
-        // --continue-review is not applicable to needs_context, treat as resume
-        console.log("Resuming after context was provided...");
-        saveState({ ...state, status: "running", needsContextDetails: undefined });
-      } else {
-        // No flags — check if the task is still in 'awaiting' state or user already provided context
-        // Since there's no way to programmatically detect context was provided,
-        // resume and let the task re-run (the agent will either succeed or NEEDS_CONTEXT again)
-        console.log("");
-        console.log("Autopilot is paused — a task needs additional context.");
-        console.log(`Task: ${state.lastTaskId}`);
-        console.log(`Details: ${state.needsContextDetails}`);
-        console.log("");
-        console.log("Options:");
-        console.log("  pnpm work --continue-review  → resume the task (after providing context)");
-        console.log("  pnpm work --accept-as-is     → skip this task and continue");
-        console.log("");
-        process.exit(0);
-      }
+    const resumeDecision = handleResumeDecision(
+      { getTasks, computeMaxReviewRounds, countSourceFiles, readJson, writeJson,
+        saveState, pushToRemote, acceptAsIs, continueReview },
+      { state }
+    );
+    if (resumeDecision.action === "exit") {
+      process.exit(resumeDecision.exitCode ?? 0);
     }
-    if (acceptAsIs) {
-      if (pauseReason === "needs_context") {
-        console.log("Skipping blocked task and continuing.");
-        // Mark the task as skipped
-        const allTasks = readJson("dev/task.json", { tasks: [] });
-        const skippedTask = (allTasks.tasks ?? []).find((t) => t.id === state.lastTaskId);
-        if (skippedTask) {
-          skippedTask.status = "skipped";
-          writeJson("dev/task.json", allTasks);
-        }
-        saveState({ ...state, status: "running", needsContextDetails: undefined });
-      } else {
-        console.log("User accepted current state as-is. Marking review as done.");
-        saveState({ ...state, status: "final_review_done" });
-        pushToRemote();
-        process.exit(0);
-      }
-    } else if (continueReview) {
-      // Grant additional rounds (same as computed max, effectively doubles the budget)
-      const planConfig = readJson(".planning/config.json", {});
-      const currentRound = state.finalReviewRound ?? 0;
-      const additionalRounds = computeMaxReviewRounds({
-        taskCount: getTasks().length,
-        sourceFileCount: countSourceFiles(),
-        configMaxRounds: planConfig?.final_review?.max_rounds,
-        reviewStrategy: planConfig?.review_strategy
-      });
-      const newMax = currentRound + additionalRounds;
-      console.log(`Extending review: ${additionalRounds} more rounds (new max: ${newMax}).`);
-      // Store extended max in state (runtime only) — do NOT write to config.json
-      // to avoid permanently inflating max_rounds across sessions
-      saveState({ ...state, status: "final_review", finalReviewRound: currentRound, sessionMaxRounds: newMax });
-      console.log("Resuming review...");
-    } else {
-      console.log("");
-      console.log("Autopilot is paused — awaiting your decision.");
-      console.log("Unresolved issues: dev/review/FINAL-REVIEW-UNRESOLVED.md");
-      console.log("");
-      console.log("Options:");
-      console.log("  pnpm work --continue-review  → extend review rounds");
-      console.log("  pnpm work --accept-as-is     → accept current state and finish");
-      console.log("");
-      process.exit(0);
-    }
+    // action === "resume" → fall through to start the loop
   }
 
   saveState({ ...loadState(), status: "starting" });
@@ -2180,46 +2146,18 @@ async function main() {
     const currentState = loadState();
     let readyTasks = getReadyTasks();
 
-    // Pre-flight: if any ready task needs codex, verify prerequisites — skip codex tasks if not available (#R4-3)
-    const hasCodexTasks = readyTasks.some(t => t.assignee === "codex");
-    const codexCheck = hasCodexTasks ? checkCodexPrerequisites() : { available: true, issues: [] };
-    if (!codexCheck.available) {
-      const codexTasks = readyTasks.filter((t) => t.assignee === "codex");
-      if (codexTasks.length > 0) {
-        console.warn(`[autopilot] Codex prerequisites missing — skipping ${codexTasks.length} codex-assigned task(s) — install codex CLI or reassign tasks to sonnet in dev/task.json`);
-        for (const issue of codexCheck.issues) console.warn(`  - ${issue}`);
-        for (const ct of codexTasks) console.warn(`  - Skipped: ${ct.id} (${ct.name})`);
-        readyTasks = readyTasks.filter((t) => t.assignee !== "codex");
-      }
-    }
-
-    // Pre-flight: if any ready task needs gemini, verify prerequisites — skip gemini tasks if not available
-    const hasGeminiTasks = readyTasks.some(t => t.assignee === "gemini");
-    const geminiCheck = hasGeminiTasks ? checkGeminiPrerequisites() : { available: true, issues: [] };
-    if (!geminiCheck.available) {
-      const geminiTasks = readyTasks.filter((t) => t.assignee === "gemini");
-      if (geminiTasks.length > 0) {
-        console.warn(`[autopilot] Gemini prerequisites missing — skipping ${geminiTasks.length} gemini-assigned task(s) — install gemini CLI or reassign tasks to sonnet in dev/task.json`);
-        for (const issue of geminiCheck.issues) console.warn(`  - ${issue}`);
-        for (const gt of geminiTasks) console.warn(`  - Skipped: ${gt.id} (${gt.name})`);
-        readyTasks = readyTasks.filter((t) => t.assignee !== "gemini");
-      }
-    }
+    // Pre-flight: filter tasks whose required CLI (codex / gemini) is not available
+    const filterResult = filterTasksByAvailableRunners(readyTasks, { checkCodexPrerequisites, checkGeminiPrerequisites });
+    readyTasks = filterResult.filteredTasks;
 
     if (readyTasks.length === 0) {
-      const originalReady = getReadyTasks();
-      if (originalReady.length > 0) {
-        unavailableCliPollCount++;
-        if (unavailableCliPollCount >= MAX_UNAVAILABLE_CLI_POLLS) {
-          console.error(`[autopilot] All remaining tasks require unavailable CLIs. Reassign tasks or install the required CLI. Autopilot stopping.`);
-          saveState({ ...loadState(), status: "blocked" });
-          break;
-        }
-        console.warn(`[autopilot] All ready tasks require unavailable CLI tools (attempt ${unavailableCliPollCount}/${MAX_UNAVAILABLE_CLI_POLLS}). Waiting for next round. — install the required CLI tool or reassign the task to an available runner`);
-        if (runOnce) break;
-        await waitWithCountdown(1);
-        continue;
-      }
+      const unavailableResult = await handleUnavailableRunners(
+        { getReadyTasks, runOnce, waitWithCountdown },
+        { unavailableCliPollCount, MAX_UNAVAILABLE_CLI_POLLS, loadState, saveState }
+      );
+      unavailableCliPollCount = unavailableResult.newCount;
+      if (unavailableResult.action === "break") break;
+      if (unavailableResult.action === "continue") continue;
     }
     // Reset counter once tasks are available through normal runners
     unavailableCliPollCount = 0;
@@ -2312,129 +2250,36 @@ async function main() {
 
     // Notify on task completion or failure (non-blocking)
     if (result.exitCode === 0 && task) {
-      // Parse agent completion status protocol — read from assistant output log
-      // since invokeRunner does not return an output field
-      let agentOutput = "";
+      const successDecision = handleSuccessResult(
+        { parseCompletionStatus, scanForDangerousOperations, appendProgressEntry,
+          ensureCleanWorkingTree, notify, formatDuration, readJson, writeJson,
+          loadState, saveState, runOnce },
+        { task, result, taskDurationMs }
+      );
+
+      // Update project memory with extracted decisions/notes and outcome tracking
       try {
-        const fullOutput = readFileSync(".autopilot/logs/assistant-output.log", "utf8");
-        const outputLines = fullOutput.split(/\r?\n/);
-        agentOutput = outputLines.slice(-20).join("\n");
-      } catch { /* file may not exist */ }
-      const completionStatus = parseCompletionStatus(agentOutput);
-      if (!completionStatus.raw) {
-        console.warn("⚠ Agent did not emit completion status — treating as DONE");
-      }
-      const dangerousOps = scanForDangerousOperations(agentOutput);
-      if (dangerousOps.length > 0) {
-        console.warn(`⚠ Dangerous operations detected in agent output: ${dangerousOps.join(", ")}`);
-        appendProgressEntry(`[WARNING] Round ${round}: dangerous operations detected — ${dangerousOps.join(", ")}`);
-      }
-      if (completionStatus.status === "BLOCKED") {
-        console.error(`Task blocked: ${completionStatus.details} — check task dependencies in dev/task.json or reassign blocked tasks`);
-        // Mark the task as "blocked" in task.json so it won't be picked again
-        const allTasks = readJson("dev/task.json", { tasks: [] });
-        const blockedTask = (allTasks.tasks ?? []).find((t) => t.id === task.id);
-        if (blockedTask) {
-          blockedTask.status = "blocked";
-          writeJson("dev/task.json", allTasks);
-        }
-        appendProgressEntry(`Task ${task.id} BLOCKED: ${completionStatus.details}`);
-        saveState({
-          ...loadState(),
-          status: "running",
-          lastTaskId: task.id,
-          lastFailureCategory: "blocked",
-          lastFailureHint: completionStatus.details
-        });
-        if (runOnce) break;
-        continue;
-      }
-      if (completionStatus.status === "NEEDS_CONTEXT") {
-        console.warn(`Task needs context: ${completionStatus.details} — autopilot pausing for user input`);
-        appendProgressEntry(`Task ${task.id} NEEDS_CONTEXT: ${completionStatus.details}`);
-        saveState({
-          ...loadState(),
-          status: "awaiting_user_decision",
-          lastTaskId: task.id,
-          needsContextDetails: completionStatus.details
-        });
-        notify("awaiting_user_decision", {
-          task_id: task.id,
-          task_name: task.name,
-          reason: "needs_context",
-          details: completionStatus.details
-        }).catch?.(() => {});
-        break;
-      }
-      if (completionStatus.status === "DONE_WITH_CONCERNS") {
-        appendProgressEntry(`Task ${task.id} completed with concerns: ${completionStatus.details}`);
-      }
+        const memory = loadMemory();
+        const agentOutput = result.outputFile && existsSync(result.outputFile)
+          ? readFileSync(result.outputFile, "utf8") : "";
+        const extracted = extractMemoryFromOutput(agentOutput, task.id, loadState().round ?? 0);
+        updateMemory(memory, extracted);
+        recordTaskOutcome(memory, task.id, task.assignee ?? "sonnet",
+          result.exitCode === 0 ? "success" : "failure", taskDurationMs);
+        saveMemory(memory);
+      } catch { /* memory is best-effort */ }
 
-      notify("task_completed", {
-        task_id: task.id,
-        task_name: task.name,
-        duration: formatDuration(taskDurationMs / 1000),
-        cost: result.costUsd ?? 0
-      }).catch?.(() => {});
-
-      // Post-task git safety net: auto-commit any uncommitted changes
-      ensureCleanWorkingTree(task.id, task.name);
+      if (successDecision.action === "continue") { if (runOnce) break; continue; }
+      if (successDecision.action === "break") break;
+      // action === "proceed" → fall through
     }
 
     if (result.failureCategory === "timeout") {
-      const taskId = task?.id ?? null;
-      const maxTaskRetries = config.loop.maxTaskRetries ?? 2;
-      const currentTaskRetries = taskId ? (taskRetryMap.get(taskId) ?? 0) : maxTaskRetries;
-      const nextTaskRetries = currentTaskRetries + 1;
-
-      saveState({
-        ...loadState(),
-        status: "waiting_retry",
-        sessionId: result.sessionId,
-        lastExitCode: result.exitCode,
-        lastFailureCategory: result.failureCategory,
-        lastFailureHint: result.failureHint ?? ""
-      });
-
-      if (taskId && nextTaskRetries <= maxTaskRetries) {
-        taskRetryMap.set(taskId, nextTaskRetries);
-        console.log(
-          `Task ${taskId} timed out (attempt ${nextTaskRetries}/${maxTaskRetries}). Re-queuing for retry.`
-        );
-      } else {
-        if (taskId) {
-          taskRetryMap.set(taskId, nextTaskRetries);
-        }
-        console.error(
-          `Task ${taskId ?? "(idle)"} timed out and exceeded max task retries (${maxTaskRetries}). Marking as failed and moving on. — consider breaking the task into smaller subtasks in dev/task.json or increasing timeout in .autopilot/config.json`
-        );
-        if (taskId) {
-          const allTasks = readJson("dev/task.json", { tasks: [] });
-          const failedTask = (allTasks.tasks ?? []).find((t) => t.id === taskId);
-          if (failedTask) {
-            failedTask.status = "failed";
-            writeJson("dev/task.json", allTasks);
-          }
-        }
-        notify("task_failed", {
-          task_id: taskId ?? "idle",
-          error: result.failureHint ?? "timeout",
-          retry_count: nextTaskRetries
-        }).catch?.(() => {});
-        appendFileSync(
-          ".autopilot/logs/autopilot.log",
-          `[timeout-skip] task=${taskId ?? "idle"} retries=${nextTaskRetries} hint=${result.failureHint ?? ""}\n`,
-          "utf8"
-        );
-        if (runOnce) {
-          break;
-        }
-        continue;
-      }
-
-      if (runOnce) {
-        break;
-      }
+      const timeoutDecision = handleTimeoutResult(
+        { notify, readJson, writeJson, loadState, saveState, runOnce },
+        { task, result, config, taskRetryMap }
+      );
+      if (timeoutDecision.action === "break") break;
       continue;
     }
 
@@ -2466,198 +2311,18 @@ async function main() {
       if (readyCheck.length === 0) {
         if (finalSummary.done + finalSummary.skipped + finalSummary.failed >= finalSummary.total && finalSummary.total > 0) {
           // --- Final Iteration Review Phase ---
-          const planConfig = readJson(".planning/config.json", {});
-          const finalReviewEnabled = planConfig?.final_review?.enabled ?? false;
-          const currentStatus = loadState().status;
+          const reviewPhaseResult = await runFinalReviewPhase(
+            { invokeRunner, recordTaskMetrics, getTasks, buildFinalReviewPrompt,
+              computeMaxReviewRounds, countSourceFiles, checkCodexPrerequisites,
+              checkGeminiPrerequisites, renderRunnerSummary, notify,
+              waitForRetry, waitWithCountdown, readText,
+              loadState, saveState, pushToRemote, runOnce },
+            { config, finalSummary, metricsSessionId, metricsSessionStartedAt }
+          );
 
-          if (finalReviewEnabled && currentStatus !== "final_review_done" && currentStatus !== "awaiting_user_decision") {
-            const reviewStrategy = planConfig?.review_strategy;
-            // Use sessionMaxRounds from state if set by --continue-review, otherwise compute
-            const stateMaxRounds = loadState().sessionMaxRounds;
-            const maxRounds = stateMaxRounds ?? computeMaxReviewRounds({
-              taskCount: finalSummary.total,
-              sourceFileCount: countSourceFiles(),
-              configMaxRounds: planConfig.final_review.max_rounds,
-              reviewStrategy
-            });
-            let reviewRound = loadState().finalReviewRound ?? 0;
-
-            if (reviewRound >= maxRounds) {
-              // Max rounds reached — check if unresolved issues exist
-              const unresolvedPath = "dev/review/FINAL-REVIEW-UNRESOLVED.md";
-              const unresolvedContent = readText(unresolvedPath, "");
-              const hasUnresolved = unresolvedContent.trim().length > 0;
-
-              if (hasUnresolved) {
-                // Gather context for standardized question format
-                let branchName = "unknown";
-                try { branchName = execSync("git rev-parse --abbrev-ref HEAD", { timeout: 5000, stdio: "pipe" }).toString().trim(); } catch { /* ignore */ }
-                const projectName = planConfig?.project_name ?? path.basename(rootDir);
-                // Count unresolved issues (rough: count lines starting with - or *)
-                const unresolvedLines = unresolvedContent.split("\n").filter(l => /^\s*[-*]\s/.test(l));
-                const unresolvedCount = unresolvedLines.length || "unknown number of";
-                const hasCritical = /\b(BUG|SECURITY)\b/.test(unresolvedContent);
-
-                console.log("");
-                console.log("╔══════════════════════════════════════════════════════════╗");
-                console.log("║  REVIEW PAUSED — Awaiting User Decision                 ║");
-                console.log("╠══════════════════════════════════════════════════════════╣");
-                console.log(`║  Context: ${branchName} / ${projectName} / final review round ${reviewRound}`);
-                console.log(`║  Question: ${unresolvedCount} unresolved issues remain after ${reviewRound} review rounds. How should we proceed?`);
-                console.log(`║  Recommendation: ${hasCritical ? "Continue review — issues include BUG/SECURITY severity (confidence: 75%)" : "Accept as-is — no critical severity issues remain (confidence: 70%)"}`);
-                console.log("║  Options:");
-                console.log("║    1. pnpm work --continue-review — extend with another batch of review rounds (~15-30 min)");
-                console.log("║    2. pnpm work --accept-as-is — accept current state and mark review complete (~0 min)");
-                console.log("║  Details: dev/review/FINAL-REVIEW-UNRESOLVED.md");
-                console.log("╚══════════════════════════════════════════════════════════╝");
-                console.log("");
-                saveState({ ...loadState(), status: "awaiting_user_decision" });
-                notify("awaiting_user_decision", {
-                  unresolved_issues: "dev/review/FINAL-REVIEW-UNRESOLVED.md",
-                  review_rounds_completed: reviewRound,
-                  options: ["pnpm work --continue-review", "pnpm work --accept-as-is"]
-                }).catch?.(() => {});
-                break;
-              }
-
-              console.log(`Final review completed after ${reviewRound} rounds — no unresolved issues. (${finalSummary.done}/${finalSummary.total})`);
-              saveState({ ...loadState(), status: "final_review_done" });
-              pushToRemote();
-              break;
-            }
-
-            reviewRound += 1;
-            console.log("");
-            console.log(`=== FINAL ITERATION REVIEW — Round ${reviewRound}/${maxRounds} ===`);
-            notify("final_review_started", {
-              round_number: reviewRound,
-              max_rounds: maxRounds
-            }).catch?.(() => {});
-
-            const previousFindingsPath = `dev/review/FINAL-REVIEW-ROUND-${reviewRound - 1}.md`;
-            const previousFindings = reviewRound > 1 ? readText(previousFindingsPath, null) : null;
-
-            // For final review, check CLI availability independently of task assignment
-            // (all tasks are DONE so hasCodexTasks/hasGeminiTasks are always false)
-            const finalCodexCheck = checkCodexPrerequisites();
-            const finalGeminiCheck = checkGeminiPrerequisites();
-
-            const reviewPrompt = buildFinalReviewPrompt(config, reviewRound, previousFindings, {
-              codexAvailable: finalCodexCheck.available,
-              geminiAvailable: finalGeminiCheck.available
-            });
-            const reviewModel = config.models.planning;
-
-            saveState({
-              ...loadState(),
-              status: "final_review",
-              finalReviewRound: reviewRound,
-              round: (loadState().round ?? 0) + 1
-            });
-
-            console.log(`Runner: ${renderRunnerSummary(config)}`);
-            console.log(`Model: ${reviewModel}`);
-
-            const reviewStartTime = Date.now();
-            const reviewStartedAt = new Date(reviewStartTime).toISOString();
-
-            const reviewResult = await invokeRunner({
-              prompt: reviewPrompt,
-              model: reviewModel,
-              config,
-              state: loadState(),
-              taskId: `final-review-${reviewRound}`
-            });
-
-            const reviewEndTime = Date.now();
-            recordTaskMetrics({
-              sessionId: metricsSessionId,
-              sessionStartedAt: metricsSessionStartedAt,
-              taskId: `final-review-${reviewRound}`,
-              model: reviewModel,
-              startedAt: reviewStartedAt,
-              completedAt: new Date(reviewEndTime).toISOString(),
-              durationMs: reviewEndTime - reviewStartTime,
-              inputTokens: reviewResult.inputTokens ?? 0,
-              outputTokens: reviewResult.outputTokens ?? 0,
-              costUsd: reviewResult.costUsd ?? 0,
-              status: reviewResult.exitCode === 0 ? "success" : reviewResult.failureCategory === "quota" ? "quota_wait" : "failed"
-            });
-
-            if (reviewResult.exitCode === 0) {
-              // Check if new fix tasks were created (tasks went from all-done to some-todo)
-              const postReviewTasks = getTasks();
-              const newTodoTasks = postReviewTasks.filter((t) => t.status === "todo");
-
-              if (newTodoTasks.length > 0) {
-                // zero_bug mode: check if remaining bugs are below threshold
-                if (reviewStrategy?.mode === "zero_bug") {
-                  const threshold = reviewStrategy.zero_bug_threshold ?? 3;
-                  if (newTodoTasks.length < threshold) {
-                    console.log(`Review round ${reviewRound}: ${newTodoTasks.length} issue(s) remain (below zero_bug threshold ${threshold}). CONVERGED.`);
-                    saveState({ ...loadState(), status: "final_review_done" });
-                    pushToRemote();
-                    break;
-                  }
-                }
-
-                console.log(`Review round ${reviewRound} created ${newTodoTasks.length} fix task(s). Executing fixes before next review.`);
-                // Let the main loop pick up fix tasks naturally
-                if (runOnce) break;
-                continue;
-              }
-
-              // No new tasks = converged or max rounds
-              if (reviewRound >= maxRounds) {
-                console.log(`Final review completed after ${reviewRound} rounds (max reached).`);
-                saveState({ ...loadState(), status: "final_review_done" });
-                pushToRemote();
-                break;
-              }
-
-              console.log(`Review round ${reviewRound} found no new issues. Review CONVERGED.`);
-              notify("final_review_done", {
-                rounds_taken: reviewRound,
-                issues_found: 0
-              }).catch?.(() => {});
-              saveState({ ...loadState(), status: "final_review_done" });
-              pushToRemote();
-              break;
-            }
-
-            // Review round failed (quota, error, etc.) — handle via normal retry logic
-            if (reviewResult.failureCategory === "quota") {
-              console.log("Quota hit during final review. Will retry after wait.");
-            }
-
-            // Fall through to normal error handling below (merge quota round-decrement into single saveState)
-            saveState({
-              ...loadState(),
-              status: reviewResult.failureCategory === "quota" ? "waiting_quota" : "waiting_retry",
-              sessionId: reviewResult.sessionId,
-              lastExitCode: reviewResult.exitCode,
-              lastFailureCategory: reviewResult.failureCategory ?? null,
-              lastFailureHint: reviewResult.failureHint ?? "",
-              ...(reviewResult.failureCategory === "quota" ? { finalReviewRound: reviewRound - 1 } : {})
-            });
-
-            if (runOnce) break;
-
-            const shouldRetry = reviewResult.failureCategory === "quota"
-              ? await waitForRetry({
-                  fallbackMinutes: config.loop.waitMinutes ?? 30,
-                  failureHint: reviewResult.failureHint,
-                  retryAfterSeconds: reviewResult.retryAfterSeconds ?? null
-                })
-              : await waitWithCountdown(config.loop.waitMinutes ?? 30);
-
-            if (!shouldRetry) {
-              saveState({ ...loadState(), status: "stopped" });
-              console.log("Autopilot interrupted during final review wait.");
-              break;
-            }
-            continue;
-          }
+          if (reviewPhaseResult.action === "break") break;
+          if (reviewPhaseResult.action === "continue") continue;
+          // action === "all_done" → fall through to notify + break below
 
           notify("all_tasks_done", {
             total_tasks: finalSummary.total
@@ -2697,37 +2362,11 @@ async function main() {
       process.exit(1);
     }
 
-    if (result.failureCategory === "quota") {
-      const retryInfo = result.retryAfterSeconds != null
-        ? ` (retry after ${formatDuration(result.retryAfterSeconds)})`
-        : "";
-      console.log(`AI quota or rate limit detected${retryInfo}. Waiting for capacity to recover ${retryCount}/${config.loop.maxRetries}.`);
-      if (result.failureHint) {
-        console.log(`  Hint: ${result.failureHint.slice(0, 200)}`);
-      }
-      notify("quota_wait", {
-        retry_after_seconds: result.retryAfterSeconds ?? null,
-        quota_type: result.failureCategory,
-        retry_count: retryCount
-      }).catch?.(() => {});
-    } else {
-      console.log(`AI exited with code ${result.exitCode}. Waiting before retry ${retryCount}/${config.loop.maxRetries}.`);
-      if (result.failureHint) {
-        console.log(`  Hint: ${result.failureHint.slice(0, 200)}`);
-      }
-    }
-    const shouldContinue = result.failureCategory === "quota"
-      ? await waitForRetry({
-          fallbackMinutes: config.loop.waitMinutes ?? 30,
-          failureHint: result.failureHint,
-          retryAfterSeconds: result.retryAfterSeconds ?? null
-        })
-      : await waitWithCountdown(config.loop.waitMinutes ?? 30);
-    if (!shouldContinue) {
-      saveState({ ...loadState(), status: "stopped" });
-      console.log("Autopilot interrupted during wait.");
-      break;
-    }
+    const failureWaitResult = await handleFailureWait(
+      { waitForRetry, waitWithCountdown, loadState, saveState },
+      { result, config }
+    );
+    if (failureWaitResult.action === "break") break;
   }
 }
 
