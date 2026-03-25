@@ -1,4 +1,9 @@
-# Robust AI Scaffold
+# xihe-loom-scaffold
+
+> **命名由来** — 遵循曦和项目三段式命名规范 `xihe-{隐喻}-{功能}`：
+> - **xihe（曦和）** — 品牌，源自中国神话中的太阳女神曦和
+> - **loom（织机）** — 隐喻，织机是将丝线编织成布匹的工具；正如这个脚手架将多个AI agent编织成完整的项目。织机本身不是产品，织出来的布才是——脚手架本身不是项目，用它搭建出来的才是
+> - **scaffold（脚手架）** — 功能，项目脚手架/编排框架
 
 A production-grade scaffold for **autonomous AI software development** -- combining durable planning state, 24/7 autopilot execution, and intelligent quota self-healing.
 
@@ -52,7 +57,7 @@ Got an existing project? `pnpm adopt` overlays the planning layer without touchi
 ## Architecture
 
 ```
-robust-ai-scaffold/
+xihe-loom-scaffold/
 ├── .planning/          # Durable planning state (PROJECT, REQUIREMENTS, ROADMAP, STATE, config.json)
 ├── .autopilot/         # Runtime config and state (model selection, retry policy, session state, project memory)
 ├── .ai/
@@ -78,7 +83,7 @@ robust-ai-scaffold/
 ### New Project
 
 ```bash
-git clone https://github.com/xihe-forge/robust-ai-scaffold.git my-project
+git clone https://github.com/xihe-forge/xihe-loom-scaffold.git my-project
 cd my-project
 pnpm install
 pnpm kickoff

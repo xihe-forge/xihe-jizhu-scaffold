@@ -683,7 +683,7 @@ async function runInterview(rl, config, scriptedInput, intakeStateStore) {
     plan = normalizeProjectPlan(extractJsonObject(planResponse.stdout));
     if (
       clarification.suggestedProjectName &&
-      (!plan.projectName || plan.projectName === "my-new-project" || plan.projectName === "robust-ai-scaffold")
+      (!plan.projectName || plan.projectName === "my-new-project" || plan.projectName === "xihe-loom-scaffold")
     ) {
       plan.projectName = clarification.suggestedProjectName;
     }

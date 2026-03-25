@@ -82,7 +82,7 @@ On Windows, you can also double-click:
 ### 1. Copy the scaffold
 
 ```powershell
-Copy-Item -Recurse -Force <template-path>\robust-ai-scaffold <target-path>\my-new-project
+Copy-Item -Recurse -Force <template-path>\xihe-loom-scaffold <target-path>\my-new-project
 ```
 
 ### 2. Enter the copied project
@@ -144,7 +144,7 @@ This repository includes a Codex skill at:
 If you copy that skill into your Codex skills directory, you can say:
 
 ```text
-Use $create-project-from-scaffold to create a new project from <template-path>\robust-ai-scaffold into <target-path>\my-new-project. Then run the foolproof setup flow and prepare 24/7 work mode.
+Use $create-project-from-scaffold to create a new project from <template-path>\xihe-loom-scaffold into <target-path>\my-new-project. Then run the foolproof setup flow and prepare 24/7 work mode.
 ```
 
 ## Good Defaults

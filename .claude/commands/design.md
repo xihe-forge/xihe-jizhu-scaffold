@@ -1,5 +1,5 @@
 <!-- GENERATED FILE — edit the .md.tmpl source, then run: pnpm gen:commands -->
-You are operating within the robust-ai-scaffold autonomous delivery system.
+You are operating within the xihe-loom-scaffold autonomous delivery system.
 
 ## Before You Begin
 1. Read `AGENTS.md` for repo rules and delivery standards

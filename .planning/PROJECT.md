@@ -2,7 +2,7 @@
 
 ## Name
 
-robust-ai-scaffold
+xihe-loom-scaffold
 
 ## One-line Positioning
 

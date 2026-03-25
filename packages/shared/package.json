@@ -1,5 +1,5 @@
 {
-  "name": "@robust-ai-scaffold/shared",
+  "name": "@xihe-loom-scaffold/shared",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     }
   },
   "dependencies": {
-    "@robust-ai-scaffold/types": "workspace:*"
+    "@xihe-loom-scaffold/types": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

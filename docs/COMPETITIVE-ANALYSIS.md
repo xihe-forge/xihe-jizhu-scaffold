@@ -6,7 +6,7 @@
 
 | Project | Core File | Lines | Architecture |
 |---------|-----------|-------|--------------|
-| **robust-ai-scaffold** (ours) | `autopilot-start.mjs` + 12 scripts | ~2000 | Opus orchestrator + Sonnet workers, state machine autopilot |
+| **xihe-loom-scaffold** (ours) | `autopilot-start.mjs` + 12 scripts | ~2000 | Opus orchestrator + Sonnet workers, state machine autopilot |
 | **superpowers** | `SKILL.md` + hooks | ~500 | Hard gates via prompt injection, skill auto-triggering |
 | **get-shit-done (GSD)** | `gsd-tools.cjs` (598 lines) | ~1200 | Fresh context per executor, wave DAG execution |
 | **workflows** | `.claude/commands/*.md` | ~800 | Orchestrator pattern, scale-based dispatch |

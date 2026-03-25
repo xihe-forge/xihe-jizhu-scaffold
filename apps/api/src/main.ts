@@ -1,5 +1,5 @@
-import { SCAFFOLD_NAME, formatTaskLabel } from "@robust-ai-scaffold/shared";
-import type { ProjectTask } from "@robust-ai-scaffold/types";
+import { SCAFFOLD_NAME, formatTaskLabel } from "@xihe-loom-scaffold/shared";
+import type { ProjectTask } from "@xihe-loom-scaffold/types";
 
 const starterTask: ProjectTask = {
   id: "T000",

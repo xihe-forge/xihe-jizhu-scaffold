@@ -1,11 +1,11 @@
 {
-  "name": "@robust-ai-scaffold/api",
+  "name": "@xihe-loom-scaffold/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@robust-ai-scaffold/shared": "workspace:*",
-    "@robust-ai-scaffold/types": "workspace:*"
+    "@xihe-loom-scaffold/shared": "workspace:*",
+    "@xihe-loom-scaffold/types": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

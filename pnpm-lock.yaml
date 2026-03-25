@@ -20,25 +20,25 @@ importers:
 
   apps/api:
     dependencies:
-      '@robust-ai-scaffold/shared':
+      '@xihe-loom-scaffold/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@robust-ai-scaffold/types':
+      '@xihe-loom-scaffold/types':
         specifier: workspace:*
         version: link:../../packages/types
 
   apps/web:
     dependencies:
-      '@robust-ai-scaffold/shared':
+      '@xihe-loom-scaffold/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@robust-ai-scaffold/types':
+      '@xihe-loom-scaffold/types':
         specifier: workspace:*
         version: link:../../packages/types
 
   packages/shared:
     dependencies:
-      '@robust-ai-scaffold/types':
+      '@xihe-loom-scaffold/types':
         specifier: workspace:*
         version: link:../types
 
