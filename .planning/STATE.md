@@ -10,7 +10,7 @@ The scaffold is feature-complete and in use for production projects. Current foc
 - **195 unit tests across 33 test suites** -- covering autopilot core, intake, health checks, utils
 - **Quota self-healing** -- dedicated `waiting_quota` state, does not consume retry budget; parses reset times when available
 - **codex-bridge & gemini-bridge** -- PowerShell modules for delegating tasks to Codex CLI and Gemini CLI
-- **Skill module system** -- impeccable (frontend anti-slop), vercel-web-design (engineering UX), xihe-search-forge (SEO/AEO); topological sort, phase mapping, skill registry
+- **Skill module system** -- impeccable (frontend anti-slop), vercel-web-design (engineering UX), xihe-rinian-seo (SEO/AEO); topological sort, phase mapping, skill registry
 - **Project templates** -- SaaS, landing-page, api-only, fullstack; pre-configured review gates and starter tasks
 - **Review gates** -- 6 stage-based gates (MRD/PRD, tech design, code, test coverage, marketing, SEO/AEO) plus final iteration multi-AI convergence review
 - **Final iteration review** -- parallel reviewers (Opus+Codex for docs, Sonnet+Codex for code), dynamic max rounds, user decision gate

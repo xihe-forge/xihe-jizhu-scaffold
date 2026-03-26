@@ -1,9 +1,9 @@
-# xihe-loom-scaffold
+# xihe-jizhu-scaffold
 
-> **命名由来** — 遵循曦和项目三段式命名规范 `xihe-{隐喻}-{功能}`：
-> - **xihe（曦和）** — 品牌，源自中国神话中的太阳女神曦和
-> - **loom（织机）** — 隐喻，织机是将丝线编织成布匹的工具；正如这个脚手架将多个AI agent编织成完整的项目。织机本身不是产品，织出来的布才是——脚手架本身不是项目，用它搭建出来的才是
-> - **scaffold（脚手架）** — 功能，项目脚手架/编排框架
+> **命名由来 / Etymology** — 遵循曦和项目三段式命名规范 `xihe-{隐喻}-{功能}`：
+> - **xihe（曦和）** — 品牌。源自中国神话中的太阳女神曦和 / Brand. Xihe, the sun goddess in Chinese mythology
+> - **jizhu（机杼）** — 隐喻。机杼是古代织机与梭子的合称，成语「独出机杼」意为独创巧思。脚手架如机杼般将代码编织成完整项目 / Metaphor. Jīzhù refers to the ancient loom and shuttle; the idiom 独出机杼 (dú chū jīzhù) means "original ingenuity". The scaffold weaves code into complete projects
+> - **scaffold（脚手架）** — 功能。项目脚手架/编排框架 / Function. Project scaffolding and orchestration framework
 
 A production-grade scaffold for **autonomous AI software development** -- combining durable planning state, 24/7 autopilot execution, and intelligent quota self-healing.
 
@@ -57,7 +57,7 @@ Got an existing project? `pnpm adopt` overlays the planning layer without touchi
 ## Architecture
 
 ```
-xihe-loom-scaffold/
+xihe-jizhu-scaffold/
 ├── .planning/          # Durable planning state (PROJECT, REQUIREMENTS, ROADMAP, STATE, config.json)
 ├── .autopilot/         # Runtime config and state (model selection, retry policy, session state, project memory)
 ├── .ai/
@@ -83,7 +83,7 @@ xihe-loom-scaffold/
 ### New Project
 
 ```bash
-git clone https://github.com/xihe-forge/xihe-loom-scaffold.git my-project
+git clone https://github.com/xihe-forge/xihe-jizhu-scaffold.git my-project
 cd my-project
 pnpm install
 pnpm kickoff
@@ -194,9 +194,9 @@ The scaffold's core architecture (autopilot, intake, review pipeline) is self-co
 |--------|------|--------|
 | **impeccable** | Frontend design generation & refinement, anti-AI-slop aesthetics (10 registered skills + 7 reference docs) | [impeccable](https://github.com/pbakaus/impeccable) |
 | **vercel-web-design** | Engineering UX quality gate (accessibility, performance, standards) | [vercel-labs](https://github.com/vercel-labs/agent-skills) |
-| **xihe-search-forge** | SEO/GEO/AEO audit, AI search engine optimization, structured data validation | [xihe-forge](https://github.com/xihe-forge/xihe-search-forge) |
+| **xihe-rinian-seo** | SEO/GEO/AEO audit, AI search engine optimization, structured data validation | [xihe-forge](https://github.com/xihe-forge/xihe-rinian-seo) |
 
-These three modules are **complementary**: impeccable handles visual aesthetics (anti-AI-slop), Vercel handles engineering standards (a11y, performance, UX), and xihe-search-forge handles search discoverability (SEO/GEO/AEO). All are used together during reviews and final iteration.
+These three modules are **complementary**: impeccable handles visual aesthetics (anti-AI-slop), Vercel handles engineering standards (a11y, performance, UX), and xihe-rinian-seo handles search discoverability (SEO/GEO/AEO). All are used together during reviews and final iteration.
 
 Skill registry: `.ai/skills/skill-registry.json`
 - Skills declare `depends_on` edges (e.g., `polish` depends on `audit`)
@@ -209,8 +209,8 @@ Skill registry: `.ai/skills/skill-registry.json`
 |-------|----------------|
 | `implement_frontend` | `impeccable/frontend-design` |
 | `review_frontend` | `impeccable/critique` -> `vercel-web-design/web-design-guidelines` -> `impeccable/audit` -> `impeccable/normalize` -> `impeccable/polish` |
-| `review_seo` | `xihe-search-forge/seo-audit` -> `xihe-search-forge/aeo-audit` -> `xihe-search-forge/aeo-monitor` -> `xihe-search-forge/seo-report` |
-| `final_review` | `impeccable/audit` -> `vercel-web-design/web-design-guidelines` -> `xihe-search-forge/seo-audit` -> `xihe-search-forge/aeo-audit` -> `xihe-search-forge/aeo-monitor` -> `xihe-search-forge/seo-report` |
+| `review_seo` | `xihe-rinian-seo/seo-audit` -> `xihe-rinian-seo/aeo-audit` -> `xihe-rinian-seo/aeo-monitor` -> `xihe-rinian-seo/seo-report` |
+| `final_review` | `impeccable/audit` -> `vercel-web-design/web-design-guidelines` -> `xihe-rinian-seo/seo-audit` -> `xihe-rinian-seo/aeo-audit` -> `xihe-rinian-seo/aeo-monitor` -> `xihe-rinian-seo/seo-report` |
 
 ## Project Templates
 

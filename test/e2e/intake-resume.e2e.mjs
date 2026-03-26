@@ -5,7 +5,7 @@ import { spawn, spawnSync } from "node:child_process";
 import process from "node:process";
 
 const repoRoot = process.cwd();
-const sandboxRoot = path.join(os.tmpdir(), "xihe-loom-scaffold-intake-resume-e2e");
+const sandboxRoot = path.join(os.tmpdir(), "xihe-jizhu-scaffold-intake-resume-e2e");
 const projectRoot = path.join(sandboxRoot, "workspace");
 const scriptedInputPath = path.join(projectRoot, "test-results", "scripted-intake.json");
 const intakeStatePath = path.join(projectRoot, ".intake", "state.json");

@@ -22,7 +22,7 @@ Pluggable, independent skill modules that extend the scaffold's capabilities. Ea
 │       └── extract/SKILL.md          # Extract reusable components/tokens
 ├── vercel-web-design/           # Engineering-grade UX quality gate (git submodule)
 │   └── skills/web-design-guidelines/SKILL.md  # Web Interface Guidelines compliance
-└── xihe-search-forge/           # SEO & AEO audit + monitoring (git submodule)
+└── xihe-rinian-seo/           # SEO & AEO audit + monitoring (git submodule)
     └── skills/
         ├── seo-audit/SKILL.md   # Full SEO audit with Lighthouse
         ├── aeo-audit/SKILL.md   # AI search optimization (9-dimension scoring)
@@ -45,11 +45,11 @@ All skill modules are managed as **git submodules** and updated via `git submodu
 |--------|--------|--------|
 | impeccable | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | `git submodule update --remote .ai/skills/impeccable` |
 | vercel-web-design | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | `git submodule update --remote .ai/skills/vercel-web-design` |
-| xihe-search-forge | [xihe-forge/xihe-search-forge](https://github.com/xihe-forge/xihe-search-forge) | `git submodule update --remote .ai/skills/xihe-search-forge` |
+| xihe-rinian-seo | [xihe-forge/xihe-rinian-seo](https://github.com/xihe-forge/xihe-rinian-seo) | `git submodule update --remote .ai/skills/xihe-rinian-seo` |
 
 ## Phase Mapping
 
-| Phase | impeccable | vercel | xihe-search-forge |
+| Phase | impeccable | vercel | xihe-rinian-seo |
 |-------|-----------|--------|-------------------|
 | Frontend implementation | `frontend-design` (generate) | — | — |
 | Frontend review | `critique` + `audit` (aesthetic QA) | `web-design-guidelines` (engineering QA) | — |

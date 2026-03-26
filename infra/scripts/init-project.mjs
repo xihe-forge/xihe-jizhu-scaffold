@@ -39,13 +39,13 @@ async function collectInteractiveOptions() {
     const rawName = await promptText(
       rl,
       "Project name",
-      currentRootName === "xihe-loom-scaffold" ? "my-new-project" : currentRootName
+      currentRootName === "xihe-jizhu-scaffold" ? "my-new-project" : currentRootName
     );
     const projectName = slugify(rawName);
     const scope = await promptText(
       rl,
       "Package scope",
-      currentScope === "@xihe-loom-scaffold" ? `@${projectName}` : currentScope
+      currentScope === "@xihe-jizhu-scaffold" ? `@${projectName}` : currentScope
     );
     const description = await promptText(rl, "Short description", currentDescription);
     const positioning = await promptText(rl, "One-line positioning", currentPositioning);
@@ -120,7 +120,7 @@ async function main() {
   const scope = getArg("scope") ?? `@${projectName}`;
   const description = getArg("description") ?? `Project scaffold for ${projectName}`;
   const positioning =
-    getArg("positioning") ?? `A project initialized from xihe-loom-scaffold for ${projectName}.`;
+    getArg("positioning") ?? `A project initialized from xihe-jizhu-scaffold for ${projectName}.`;
 
   saveAutopilotConfig(loadAutopilotConfig({ persist: true }));
   initializeProjectIdentity({ projectName, scope, description, positioning });

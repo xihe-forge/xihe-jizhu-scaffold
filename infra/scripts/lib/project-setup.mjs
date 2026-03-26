@@ -2,7 +2,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { readJson, readText, replaceMarkdownSection, resolvePath, slugify, writeJson, writeText, ensureDir } from "./utils.mjs";
 
 export function detectCurrentRootName() {
-  return readJson("package.json", {})?.name ?? "xihe-loom-scaffold";
+  return readJson("package.json", {})?.name ?? "xihe-jizhu-scaffold";
 }
 
 export function detectCurrentScope() {
@@ -45,9 +45,9 @@ export function initializeProjectIdentity({ projectName, scope, description, pos
 
   const replacements = [
     [currentScope, scope],
-    ["@xihe-loom-scaffold", scope],
+    ["@xihe-jizhu-scaffold", scope],
     [currentRootName, projectName],
-    ["xihe-loom-scaffold", projectName],
+    ["xihe-jizhu-scaffold", projectName],
     ["Resilient monorepo scaffold with durable planning state", description]
   ];
 

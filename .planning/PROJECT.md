@@ -2,7 +2,7 @@
 
 ## Name
 
-xihe-loom-scaffold
+xihe-jizhu-scaffold
 
 ## One-line Positioning
 

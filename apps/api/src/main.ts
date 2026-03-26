@@ -1,5 +1,5 @@
-import { SCAFFOLD_NAME, formatTaskLabel } from "@xihe-loom-scaffold/shared";
-import type { ProjectTask } from "@xihe-loom-scaffold/types";
+import { SCAFFOLD_NAME, formatTaskLabel } from "@xihe-jizhu-scaffold/shared";
+import type { ProjectTask } from "@xihe-jizhu-scaffold/types";
 
 const starterTask: ProjectTask = {
   id: "T000",

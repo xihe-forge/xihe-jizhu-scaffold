@@ -20,25 +20,25 @@ importers:
 
   apps/api:
     dependencies:
-      '@xihe-loom-scaffold/shared':
+      '@xihe-jizhu-scaffold/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@xihe-loom-scaffold/types':
+      '@xihe-jizhu-scaffold/types':
         specifier: workspace:*
         version: link:../../packages/types
 
   apps/web:
     dependencies:
-      '@xihe-loom-scaffold/shared':
+      '@xihe-jizhu-scaffold/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@xihe-loom-scaffold/types':
+      '@xihe-jizhu-scaffold/types':
         specifier: workspace:*
         version: link:../../packages/types
 
   packages/shared:
     dependencies:
-      '@xihe-loom-scaffold/types':
+      '@xihe-jizhu-scaffold/types':
         specifier: workspace:*
         version: link:../types
 

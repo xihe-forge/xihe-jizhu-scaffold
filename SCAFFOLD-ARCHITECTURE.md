@@ -38,7 +38,7 @@ The `.ai/` directory is runtime-agnostic and stores:
 - templates
 - agent notes
 - hook notes
-- `.ai/skills/` -- skill modules (impeccable, vercel-web-design, xihe-search-forge) and the skill registry (`skill-registry.json`)
+- `.ai/skills/` -- skill modules (impeccable, vercel-web-design, xihe-rinian-seo) and the skill registry (`skill-registry.json`)
 
 ## Layer 4: Runtime Bridges
 

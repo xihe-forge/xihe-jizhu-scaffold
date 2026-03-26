@@ -1,5 +1,5 @@
 {
-  "name": "@xihe-loom-scaffold/shared",
+  "name": "@xihe-jizhu-scaffold/shared",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     }
   },
   "dependencies": {
-    "@xihe-loom-scaffold/types": "workspace:*"
+    "@xihe-jizhu-scaffold/types": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

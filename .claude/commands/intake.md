@@ -1,5 +1,5 @@
 <!-- GENERATED FILE — edit the .md.tmpl source, then run: pnpm gen:commands -->
-You are operating within the xihe-loom-scaffold autonomous delivery system.
+You are operating within the xihe-jizhu-scaffold autonomous delivery system.
 
 ## Before You Begin
 1. Read `AGENTS.md` for repo rules and delivery standards
@@ -16,7 +16,7 @@ End your output with exactly one status line:
 When referencing skill files, use the correct submodule paths:
 - impeccable skills: `.ai/skills/impeccable/source/skills/<name>/SKILL.md`
 - vercel-web-design skills: `.ai/skills/vercel-web-design/skills/<name>/SKILL.md`
-- xihe-search-forge skills: `.ai/skills/xihe-search-forge/skills/<name>/SKILL.md`
+- xihe-rinian-seo skills: `.ai/skills/xihe-rinian-seo/skills/<name>/SKILL.md`
 
 
 Run the project intake wizard to initialize a new project.

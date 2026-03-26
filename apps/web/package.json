@@ -1,11 +1,11 @@
 {
-  "name": "@xihe-loom-scaffold/web",
+  "name": "@xihe-jizhu-scaffold/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@xihe-loom-scaffold/shared": "workspace:*",
-    "@xihe-loom-scaffold/types": "workspace:*"
+    "@xihe-jizhu-scaffold/shared": "workspace:*",
+    "@xihe-jizhu-scaffold/types": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

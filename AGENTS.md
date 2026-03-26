@@ -225,8 +225,8 @@ Review gate configuration is in `.planning/config.json` under `review_gates`.
 | **Code implementation done** | `.ai/recipes/review-code.md` | impeccable, vercel-web-design | YES |
 | **Testing complete** | `.ai/recipes/review-test-coverage.md` | (scaffold built-in) | YES |
 | **Marketing materials created** | `.ai/recipes/review-marketing.md` | (scaffold built-in) | No (advisory) |
-| **Public pages deployed** | `.ai/recipes/review-seo-aeo.md` | xihe-search-forge | No (advisory) |
-| **All tasks complete** | `.ai/recipes/review-final-iteration.md` | impeccable, vercel-web-design, xihe-search-forge | YES |
+| **Public pages deployed** | `.ai/recipes/review-seo-aeo.md` | xihe-rinian-seo | No (advisory) |
+| **All tasks complete** | `.ai/recipes/review-final-iteration.md` | impeccable, vercel-web-design, xihe-rinian-seo | YES |
 
 **Supplementary Checklists** (referenced by review recipes):
 - `.ai/recipes/frontend-review-checklist.md` — real-world frontend bugs (layout, auth UI, pricing, responsive, i18n). **Mandatory** for all frontend code reviews.
@@ -324,12 +324,12 @@ These are **not** part of the core autopilot — they extend it.
 |--------|------|----------|
 | **impeccable** | Frontend design generation & refinement (anti-AI-slop) | `.ai/skills/impeccable/` |
 | **vercel-web-design** | Engineering UX quality gate (a11y, performance, standards) | `.ai/skills/vercel-web-design/` |
-| **xihe-search-forge** | SEO & AEO audit, AI search monitoring, impact reporting | `.ai/skills/xihe-search-forge/` (git submodule) |
+| **xihe-rinian-seo** | SEO & AEO audit, AI search monitoring, impact reporting | `.ai/skills/xihe-rinian-seo/` (git submodule) |
 
 **How they're used:**
 - During **implementation**: autopilot injects impeccable's `frontend-design.md` instructions for frontend tasks
 - During **review**: code reviewers apply impeccable `audit/SKILL.md` (aesthetic) + vercel `web-design-guidelines/SKILL.md` (engineering)
-- During **review_seo**: xihe-search-forge runs SEO audit, AEO audit (9-dimension), citation monitoring, and impact reporting
+- During **review_seo**: xihe-rinian-seo runs SEO audit, AEO audit (9-dimension), citation monitoring, and impact reporting
 - During **final review**: all three modules are used as parallel quality gates
 - **CLI commands**: `/design`, `/ux-audit`, `/review` invoke these skills directly
 

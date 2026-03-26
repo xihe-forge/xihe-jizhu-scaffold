@@ -63,7 +63,7 @@
       "enabled": true,
       "blocking": false,
       "recipe": ".ai/recipes/review-seo-aeo.md",
-      "tools": ["xihe-search-forge"]
+      "tools": ["xihe-rinian-seo"]
     }
   },
   "optional_modules": {
@@ -99,8 +99,8 @@
       "path": ".ai/skills/vercel-web-design",
       "description": "Vercel-style web design patterns and best practices"
     },
-    "xihe-search-forge": {
-      "path": ".ai/skills/xihe-search-forge",
+    "xihe-rinian-seo": {
+      "path": ".ai/skills/xihe-rinian-seo",
       "description": "SEO + AEO audit — crawl, Schema validation, llms.txt, FAQ extraction, Lighthouse comparison",
       "skills": ["seo-audit", "aeo-audit", "seo-report", "aeo-monitor"],
       "scripts": {

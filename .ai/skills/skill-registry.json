@@ -12,18 +12,18 @@
       "impeccable/polish"
     ],
     "review_seo": [
-      "xihe-search-forge/seo-audit",
-      "xihe-search-forge/aeo-audit",
-      "xihe-search-forge/aeo-monitor",
-      "xihe-search-forge/seo-report"
+      "xihe-rinian-seo/seo-audit",
+      "xihe-rinian-seo/aeo-audit",
+      "xihe-rinian-seo/aeo-monitor",
+      "xihe-rinian-seo/seo-report"
     ],
     "final_review": [
       "impeccable/audit",
       "vercel-web-design/web-design-guidelines",
-      "xihe-search-forge/seo-audit",
-      "xihe-search-forge/aeo-audit",
-      "xihe-search-forge/aeo-monitor",
-      "xihe-search-forge/seo-report"
+      "xihe-rinian-seo/seo-audit",
+      "xihe-rinian-seo/aeo-audit",
+      "xihe-rinian-seo/aeo-monitor",
+      "xihe-rinian-seo/seo-report"
     ]
   },
 
@@ -129,12 +129,12 @@
       }
     },
 
-    "xihe-search-forge": {
+    "xihe-rinian-seo": {
       "version": "0.2.0",
       "description": "SEO & AEO audit, monitoring, and reporting. AI search optimization and traditional SEO quality gates.",
-      "source": "https://github.com/xihe-forge/xihe-search-forge",
+      "source": "https://github.com/xihe-forge/xihe-rinian-seo",
       "license": "MIT",
-      "path": ".ai/skills/xihe-search-forge",
+      "path": ".ai/skills/xihe-rinian-seo",
       "trigger": {
         "phase": ["review", "final_review", "deploy"],
         "task_tags": ["seo", "aeo", "geo", "search", "marketing", "landing-page", "public-page"],
@@ -160,7 +160,7 @@
           "file": "skills/seo-report/SKILL.md",
           "role": "seo_reporting",
           "when": "Before/after comparison and impact analysis of SEO/AEO changes",
-          "depends_on": "xihe-search-forge/seo-audit"
+          "depends_on": "xihe-rinian-seo/seo-audit"
         }
       }
     }
@@ -176,13 +176,13 @@
       "refinement": ["impeccable/polish", "impeccable/normalize"]
     },
     "review_seo": {
-      "seo_gate": ["xihe-search-forge/seo-audit", "xihe-search-forge/aeo-audit"],
-      "monitoring": ["xihe-search-forge/aeo-monitor"],
-      "reporting": ["xihe-search-forge/seo-report"]
+      "seo_gate": ["xihe-rinian-seo/seo-audit", "xihe-rinian-seo/aeo-audit"],
+      "monitoring": ["xihe-rinian-seo/aeo-monitor"],
+      "reporting": ["xihe-rinian-seo/seo-report"]
     },
     "final_review": {
       "qa_gate": ["impeccable/audit", "vercel-web-design/web-design-guidelines"],
-      "search_gate": ["xihe-search-forge/seo-audit", "xihe-search-forge/aeo-audit", "xihe-search-forge/aeo-monitor", "xihe-search-forge/seo-report"]
+      "search_gate": ["xihe-rinian-seo/seo-audit", "xihe-rinian-seo/aeo-audit", "xihe-rinian-seo/aeo-monitor", "xihe-rinian-seo/seo-report"]
     }
   }
 }
