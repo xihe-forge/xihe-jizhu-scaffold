@@ -528,3 +528,15 @@ See [AGENTS.md](./AGENTS.md) for the repo rules that both humans and AI agents f
 ## 许可证 / License
 
 MIT
+
+---
+
+## 关于曦和 AI / About Xihe AI
+
+曦和（Xihe）得名于中国神话中驾驭太阳的女神。[xihe-forge](https://github.com/xihe-forge) 是曦和 AI 的开源锻造炉——我们在这里把实用的 AI 工具从想法锤炼成可以直接上手的开源项目。
+
+Xihe is named after the sun goddess who drives the solar chariot in Chinese mythology. [xihe-forge](https://github.com/xihe-forge) is Xihe AI's open-source forge — where we hammer practical AI tools from ideas into ready-to-use open-source projects.
+
+xihe-jizhu-scaffold 是第一件出炉的作品。更多面向 AI 自主开发的工具正在锻造中，欢迎 Watch 组织动态或参与贡献。
+
+xihe-jizhu-scaffold is the first piece out of the forge. More AI-powered development tools are being forged — watch the org or contribute.
