@@ -274,9 +274,9 @@ The autopilot tracks per-task cost and token usage in `dev/metrics.json`:
 
 ## 阶段审查门 / Stage-Based Review Gates
 
-脚手架在每个开发阶段强制执行审查。审查门配置在 `.planning/config.json` 的 `review_gates` 中。
+脚手架在每个开发阶段强制执行 AI 自动审查——审查指令被注入到 AI 的 prompt 中，由 AI 按照 recipe 剧本自检。审查门配置在 `.planning/config.json` 的 `review_gates` 中。当 AI 返回 `NEEDS_CONTEXT`（需要人工补充信息）或最终审查轮次用尽时，自动驾驶会暂停等待人工介入。
 
-The scaffold enforces mandatory reviews at each development stage. Review gate configuration is in `.planning/config.json` under `review_gates`.
+The scaffold enforces automated AI reviews at each development stage — review instructions are injected into the AI's prompt, and the AI self-reviews following recipe playbooks. Review gate configuration is in `.planning/config.json` under `review_gates`. The autopilot pauses for human input when the AI returns `NEEDS_CONTEXT` or when max review rounds are exhausted.
 
 ```
 MRD/PRD 已创建 / Created -------> review-mrd-prd.md        [阻塞 / BLOCKING]
