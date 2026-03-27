@@ -1438,8 +1438,8 @@ function buildFinalReviewPrompt(config, round, previousFindings, { codexAvailabl
   } else {
     parts.push(
       `This is round ${round}/${maxRounds}.`,
-      "If zero new BUG/SECURITY/COVERAGE GAP findings → the review has CONVERGED. Phase is complete.",
-      "If there are new findings → fix them, and the autopilot will start the next review round automatically."
+      "If zero new BUG/SECURITY/COVERAGE GAP findings → increment the consecutive clean-round counter. The review CONVERGES only after 3 consecutive rounds with zero new findings.",
+      "If there are new findings → fix them, reset the consecutive counter to 0, and the autopilot will start the next review round automatically."
     );
   }
 
@@ -2279,7 +2279,7 @@ async function main() {
 
     if (result.failureCategory === "timeout") {
       const timeoutDecision = handleTimeoutResult(
-        { notify, readJson, writeJson, loadState, saveState, runOnce },
+        { notify, appendProgressEntry, readJson, writeJson, loadState, saveState, runOnce },
         { task, result, config, taskRetryMap }
       );
       if (timeoutDecision.action === "break") break;

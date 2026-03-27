@@ -142,22 +142,22 @@
       },
       "skills": {
         "seo-audit": {
-          "file": "skills/seo-audit/SKILL.md",
+          "file": "skills/xihe-rinian-seo/SKILL.md",
           "role": "seo_audit",
           "when": "Full SEO audit with Lighthouse integration for public-facing pages"
         },
         "aeo-audit": {
-          "file": "skills/aeo-audit/SKILL.md",
+          "file": "skills/xihe-rinian-seo-aeo/SKILL.md",
           "role": "aeo_audit",
           "when": "AI Answer Engine Optimization audit (9-dimension scoring) for AI search visibility"
         },
         "aeo-monitor": {
-          "file": "skills/aeo-monitor/SKILL.md",
+          "file": "skills/xihe-rinian-seo-citation/SKILL.md",
           "role": "aeo_monitoring",
           "when": "AI search citation tracking, sentiment analysis, and competitor comparison"
         },
         "seo-report": {
-          "file": "skills/seo-report/SKILL.md",
+          "file": "skills/xihe-rinian-seo-report/SKILL.md",
           "role": "seo_reporting",
           "when": "Before/after comparison and impact analysis of SEO/AEO changes",
           "depends_on": "xihe-rinian-seo/seo-audit"

@@ -11,6 +11,7 @@ import {
   detectFailureCategoryFromText,
   getTaskProgressSummary,
   getReadyTasks,
+  getNextTask,
   buildPrompt,
   buildReviewGateInstructions,
   buildFinalReviewPrompt,
@@ -23,7 +24,9 @@ import {
   buildGeminiDelegationBlock,
   parseCompletionStatus,
   ensureCleanWorkingTree,
-  pushToRemote
+  pushToRemote,
+  resolveModel,
+  scanForDangerousOperations
 } from "../../infra/scripts/autopilot-start.mjs";
 
 import {
@@ -917,7 +920,7 @@ describe("buildFinalReviewPrompt", () => {
 
     const prompt = buildFinalReviewPrompt(mockConfig, 1, null);
 
-    assert.ok(prompt.includes("CONVERGED"), "Expected convergence criteria");
+    assert.ok(prompt.includes("CONVERGES"), "Expected convergence criteria");
   });
 
   it("includes review tools from config", () => {
@@ -1895,6 +1898,223 @@ describe("getCurrentBranch", () => {
     // Verify function exists — it calls real git, so only check signature
     assert.equal(typeof getCurrentBranch, "function");
     assert.equal(getCurrentBranch.length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getNextTask — priority-ordered task selection
+// ---------------------------------------------------------------------------
+
+describe("getNextTask", () => {
+  let originalTaskJson;
+
+  beforeEach(() => {
+    originalTaskJson = saveFixture("dev/task.json");
+  });
+
+  afterEach(() => {
+    restoreFixture("dev/task.json", originalTaskJson);
+  });
+
+  it("returns null when task list is empty", () => {
+    writeTaskJson([]);
+    assert.equal(getNextTask(), null);
+  });
+
+  it("returns null when all tasks are done", () => {
+    writeTaskJson([
+      { id: "T001", status: "done", priority: "P0", name: "Done task" }
+    ]);
+    assert.equal(getNextTask(), null);
+  });
+
+  it("returns the first todo task with satisfied dependencies", () => {
+    writeTaskJson([
+      { id: "T001", status: "todo", priority: "P0", name: "Ready task" }
+    ]);
+    const task = getNextTask();
+    assert.ok(task !== null, "should return a task");
+    assert.equal(task.id, "T001");
+  });
+
+  it("returns P0 task over P1 task", () => {
+    writeTaskJson([
+      { id: "T002", status: "todo", priority: "P1", name: "Lower priority" },
+      { id: "T001", status: "todo", priority: "P0", name: "Higher priority" }
+    ]);
+    const task = getNextTask();
+    assert.equal(task.id, "T001", "P0 should be selected before P1");
+  });
+
+  it("skips tasks whose dependencies are not yet done", () => {
+    writeTaskJson([
+      { id: "T001", status: "todo", priority: "P0", name: "Blocked", depends_on: ["T002"] },
+      { id: "T002", status: "todo", priority: "P0", name: "Dependency" }
+    ]);
+    // T001 depends on T002 which is still todo — T002 should be returned first
+    const task = getNextTask();
+    assert.equal(task.id, "T002", "should return the unblocked dependency first");
+  });
+
+  it("returns task once its dependency is done", () => {
+    writeTaskJson([
+      { id: "T001", status: "todo", priority: "P0", name: "Now ready", depends_on: ["T002"] },
+      { id: "T002", status: "done", priority: "P0", name: "Completed dep" }
+    ]);
+    const task = getNextTask();
+    assert.equal(task.id, "T001", "should return task when dependency is satisfied");
+  });
+
+  it("returns null when the only todo task has an unknown dependency", () => {
+    writeTaskJson([
+      { id: "T001", status: "todo", priority: "P0", name: "Bad dep", depends_on: ["T999"] }
+    ]);
+    assert.equal(getNextTask(), null, "unknown dep should be treated as unsatisfied");
+  });
+
+  it("returns null when all todo tasks are blocked", () => {
+    writeTaskJson([
+      { id: "T001", status: "todo", priority: "P0", name: "Blocked A", depends_on: ["T002"] },
+      { id: "T002", status: "todo", priority: "P0", name: "Blocked B", depends_on: ["T001"] }
+    ]);
+    assert.equal(getNextTask(), null, "circular-blocked tasks should yield null");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveModel — model selection based on task type and assignee
+// ---------------------------------------------------------------------------
+
+describe("resolveModel", () => {
+  const mockConfig = {
+    models: { planning: "claude-opus", execution: "claude-sonnet" }
+  };
+
+  it("returns planning model when task is null (idle mode)", () => {
+    assert.equal(resolveModel(null, mockConfig), "claude-opus");
+  });
+
+  it("returns planning model for opus-assigned tasks", () => {
+    const task = { id: "T001", assignee: "opus", type: "implementation" };
+    assert.equal(resolveModel(task, mockConfig), "claude-opus");
+  });
+
+  it("returns planning model for codex-assigned tasks", () => {
+    const task = { id: "T001", assignee: "codex", type: "implementation" };
+    assert.equal(resolveModel(task, mockConfig), "claude-opus");
+  });
+
+  it("returns planning model for gemini-assigned tasks", () => {
+    const task = { id: "T001", assignee: "gemini", type: "implementation" };
+    assert.equal(resolveModel(task, mockConfig), "claude-opus");
+  });
+
+  it("returns planning model for planning type tasks", () => {
+    const task = { id: "T001", assignee: "sonnet", type: "planning" };
+    assert.equal(resolveModel(task, mockConfig), "claude-opus");
+  });
+
+  it("returns planning model for review type tasks", () => {
+    const task = { id: "T001", assignee: "sonnet", type: "review" };
+    assert.equal(resolveModel(task, mockConfig), "claude-opus");
+  });
+
+  it("returns planning model for docs type tasks", () => {
+    const task = { id: "T001", assignee: "sonnet", type: "docs" };
+    assert.equal(resolveModel(task, mockConfig), "claude-opus");
+  });
+
+  it("returns planning model for research type tasks", () => {
+    const task = { id: "T001", assignee: "sonnet", type: "research" };
+    assert.equal(resolveModel(task, mockConfig), "claude-opus");
+  });
+
+  it("returns execution model for implementation tasks assigned to sonnet", () => {
+    const task = { id: "T001", assignee: "sonnet", type: "implementation" };
+    assert.equal(resolveModel(task, mockConfig), "claude-sonnet");
+  });
+
+  it("returns execution model for tasks with no assignee and implementation type", () => {
+    const task = { id: "T001", type: "implementation" };
+    assert.equal(resolveModel(task, mockConfig), "claude-sonnet");
+  });
+
+  it("falls back to planning model when execution model is not configured", () => {
+    const config = { models: { planning: "claude-opus" } };
+    const task = { id: "T001", assignee: "sonnet", type: "implementation" };
+    assert.equal(resolveModel(task, config), "claude-opus");
+  });
+
+  it("is case-insensitive for assignee field", () => {
+    const taskUpper = { id: "T001", assignee: "OPUS", type: "implementation" };
+    assert.equal(resolveModel(taskUpper, mockConfig), "claude-opus");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// scanForDangerousOperations — output safety scanner
+// ---------------------------------------------------------------------------
+
+describe("scanForDangerousOperations", () => {
+  it("returns empty array for clean output", () => {
+    const result = scanForDangerousOperations("All tests passed. Build succeeded.");
+    assert.deepEqual(result, []);
+  });
+
+  it("returns empty array for null/empty input", () => {
+    assert.deepEqual(scanForDangerousOperations(null), []);
+    assert.deepEqual(scanForDangerousOperations(""), []);
+  });
+
+  it("detects recursive delete outside /tmp", () => {
+    const result = scanForDangerousOperations("running: rm -rf /home/user/project");
+    assert.ok(result.includes("recursive delete outside /tmp"), `expected match, got: ${JSON.stringify(result)}`);
+  });
+
+  it("does not flag rm -rf /tmp (safe temp delete)", () => {
+    const result = scanForDangerousOperations("rm -rf /tmp/build-artifacts");
+    assert.deepEqual(result, [], "rm -rf /tmp should not be flagged");
+  });
+
+  it("detects DROP TABLE statement", () => {
+    const result = scanForDangerousOperations("exec: DROP TABLE users");
+    assert.ok(result.includes("database destructive operation"), `expected match, got: ${JSON.stringify(result)}`);
+  });
+
+  it("detects DROP DATABASE statement", () => {
+    const result = scanForDangerousOperations("DROP DATABASE mydb");
+    assert.ok(result.includes("database destructive operation"));
+  });
+
+  it("detects force push", () => {
+    const result = scanForDangerousOperations("git push --force origin main");
+    assert.ok(result.includes("force push"), `expected force push match, got: ${JSON.stringify(result)}`);
+  });
+
+  it("detects push -f variant", () => {
+    const result = scanForDangerousOperations("git push -f origin main");
+    assert.ok(result.includes("force push"), `expected force push -f match, got: ${JSON.stringify(result)}`);
+  });
+
+  it("detects git reset --hard", () => {
+    const result = scanForDangerousOperations("git reset --hard HEAD~1");
+    assert.ok(result.includes("hard reset"), `expected hard reset match, got: ${JSON.stringify(result)}`);
+  });
+
+  it("detects possible hardcoded secret assignment", () => {
+    const result = scanForDangerousOperations('process.env.API_KEY = "abcdefghijklmnopqrstu"');
+    assert.ok(result.includes("possible hardcoded secret assignment"), `expected secret match, got: ${JSON.stringify(result)}`);
+  });
+
+  it("returns multiple matches when multiple patterns are triggered", () => {
+    const output = "git reset --hard HEAD\nDROP TABLE users\ngit push --force";
+    const result = scanForDangerousOperations(output);
+    assert.ok(result.length >= 3, `expected at least 3 matches, got ${result.length}: ${JSON.stringify(result)}`);
+  });
+
+  it("is case-insensitive for SQL patterns", () => {
+    const lower = scanForDangerousOperations("drop table Users");
+    assert.ok(lower.includes("database destructive operation"), "should match lowercase drop table");
   });
 });
 

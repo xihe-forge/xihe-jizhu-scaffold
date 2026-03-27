@@ -34,19 +34,29 @@ try {
   process.exit(1);
 }
 
-// Build set of valid skill IDs from skill-registry.json
+// Build set of valid skill IDs from skill-registry.json and check disk paths
 const validSkills = new Set();
+let errors = 0;
 if (skillRegistry.skills) {
   for (const [moduleName, moduleData] of Object.entries(skillRegistry.skills)) {
     if (moduleData && moduleData.skills) {
-      for (const skillName of Object.keys(moduleData.skills)) {
+      const modulePath = moduleData.path ? path.join(root, moduleData.path) : null;
+      for (const [skillName, skillMeta] of Object.entries(moduleData.skills)) {
         validSkills.add(`${moduleName}/${skillName}`);
+        // Check that the skill's file field points to an existing file on disk
+        if (skillMeta && skillMeta.file && modulePath) {
+          const skillFilePath = path.join(modulePath, skillMeta.file);
+          if (!existsSync(skillFilePath)) {
+            console.error(`FAIL: skill "${moduleName}/${skillName}" file not found on disk: ${skillFilePath}`);
+            errors++;
+          } else {
+            console.log(`OK: skill file exists — ${moduleName}/${skillName} (${skillMeta.file})`);
+          }
+        }
       }
     }
   }
 }
-
-let errors = 0;
 
 if (!registry.commands) {
   console.error("FAIL: command-registry.json has no \"commands\" property");

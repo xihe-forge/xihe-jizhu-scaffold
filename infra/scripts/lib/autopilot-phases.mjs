@@ -192,7 +192,7 @@ export function handleSuccessResult(
  * @returns {{ action: "continue" | "break" }}
  */
 export function handleTimeoutResult(
-  { notify, readJson, writeJson, loadState, saveState, runOnce },
+  { notify, appendProgressEntry, readJson, writeJson, loadState, saveState, runOnce },
   { task, result, config, taskRetryMap }
 ) {
   const taskId = task?.id ?? null;
@@ -234,11 +234,7 @@ export function handleTimeoutResult(
       error: result.failureHint ?? "timeout",
       retry_count: nextTaskRetries
     }).catch?.(() => {});
-    appendFileSync(
-      ".autopilot/logs/autopilot.log",
-      `[timeout-skip] task=${taskId ?? "idle"} retries=${nextTaskRetries} hint=${result.failureHint ?? ""}\n`,
-      "utf8"
-    );
+    appendProgressEntry(`Task ${taskId ?? "idle"} timeout_skip after ${nextTaskRetries} retries: ${result.failureHint ?? ""}`);
     if (runOnce) {
       return { action: "break" };
     }
@@ -439,6 +435,8 @@ export async function runFinalReviewPhase(
     reviewStrategy
   });
   let reviewRound = loadState().finalReviewRound ?? 0;
+  // Tracks how many consecutive review rounds produced zero new issues
+  let consecutiveZeroRounds = loadState().consecutiveZeroRounds ?? 0;
 
   if (reviewRound >= maxRounds) {
     // Max rounds reached — check if unresolved issues exist
@@ -505,7 +503,8 @@ export async function runFinalReviewPhase(
   saveState({
     ...loadState(),
     status: "final_review",
-    finalReviewRound: reviewRound
+    finalReviewRound: reviewRound,
+    consecutiveZeroRounds
   });
 
   console.log(`Runner: ${renderRunnerSummary(config)}`);
@@ -553,29 +552,41 @@ export async function runFinalReviewPhase(
         }
       }
 
-      // Review succeeded and created new tasks — only here do we advance the round counter
-      saveState({ ...loadState(), round: (loadState().round ?? 0) + 1 });
-      console.log(`Review round ${reviewRound} created ${newTodoTasks.length} fix task(s). Executing fixes before next review.`);
+      // New issues found — reset consecutive-zero counter and advance round
+      saveState({ ...loadState(), round: (loadState().round ?? 0) + 1, consecutiveZeroRounds: 0 });
+      console.log(`Review round ${reviewRound} created ${newTodoTasks.length} fix task(s). Consecutive zero-issue streak reset. Executing fixes before next review.`);
       if (runOnce) return { action: "break" };
       return { action: "continue" };
     }
 
+    // No new tasks — increment consecutive-zero counter
+    consecutiveZeroRounds += 1;
+    const requiredZeroRounds = 3;
+
     // No new tasks = converged or max rounds
     if (reviewRound >= maxRounds) {
       console.log(`Final review completed after ${reviewRound} rounds (max reached).`);
-      saveState({ ...loadState(), status: "final_review_done" });
+      saveState({ ...loadState(), status: "final_review_done", consecutiveZeroRounds });
       pushToRemote();
       return { action: "break" };
     }
 
-    console.log(`Review round ${reviewRound} found no new issues. Review CONVERGED.`);
-    notify("final_review_done", {
-      rounds_taken: reviewRound,
-      issues_found: 0
-    }).catch?.(() => {});
-    saveState({ ...loadState(), status: "final_review_done" });
-    pushToRemote();
-    return { action: "break" };
+    if (consecutiveZeroRounds >= requiredZeroRounds) {
+      console.log(`Review round ${reviewRound} found no new issues (${consecutiveZeroRounds} consecutive clean rounds ≥ ${requiredZeroRounds} required). Review CONVERGED.`);
+      notify("final_review_done", {
+        rounds_taken: reviewRound,
+        consecutive_clean_rounds: consecutiveZeroRounds,
+        issues_found: 0
+      }).catch?.(() => {});
+      saveState({ ...loadState(), status: "final_review_done", consecutiveZeroRounds });
+      pushToRemote();
+      return { action: "break" };
+    }
+
+    console.log(`Review round ${reviewRound} found no new issues (${consecutiveZeroRounds}/${requiredZeroRounds} consecutive clean rounds required). Continuing review.`);
+    saveState({ ...loadState(), consecutiveZeroRounds });
+    if (runOnce) return { action: "break" };
+    return { action: "continue" };
   }
 
   // Review round failed (quota, error, etc.) — handle via normal retry logic
@@ -590,7 +601,8 @@ export async function runFinalReviewPhase(
     lastExitCode: reviewResult.exitCode,
     lastFailureCategory: reviewResult.failureCategory ?? null,
     lastFailureHint: reviewResult.failureHint ?? "",
-    ...(reviewResult.failureCategory === "quota" ? { finalReviewRound: reviewRound - 1 } : {})
+    finalReviewRound: reviewRound - 1,
+    consecutiveZeroRounds
   });
 
   if (runOnce) return { action: "break" };

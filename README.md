@@ -82,14 +82,14 @@ xihe-jizhu-scaffold/
 ├── .autopilot/         # 运行时配置和状态 / Runtime config and state (model selection, retry policy, session state, project memory)
 ├── .ai/
 │   ├── recipes/        # Agent 剧本 / Agent playbooks (implement, review, diagnose, adopt, security-audit, etc.)
-│   ├── skills/         # 外部技能模块 / External skill modules (impeccable, vercel-web-design)
+│   ├── skills/         # 外部技能模块 / External skill modules (impeccable, vercel-web-design, xihe-rinian-seo)
 │   └── templates/      # 项目类型模板 / Project type templates (saas, landing-page, api-only, fullstack)
 ├── .claude/commands/   # CLI 斜杠命令 / CLI slash commands, templates (*.md.tmpl), command-registry.json
 ├── apps/               # 应用入口 / Application entrypoints (web, api)
 ├── packages/           # 共享代码和类型 / Shared code and types
 ├── docs/               # 研究、MRD、PRD、技术规格、设计文档 / Research, MRD, PRD, tech specs, design docs
-├── dev/                # task.json, progress.txt, metrics.json, bug 修复、审查日志 / Bug fixes, review logs
-├── test/               # 单元测试 / Unit tests (195 tests across 33 test suites)
+├── dev/                # task.json, progress.txt, metrics.json, reports/, bug 修复、审查日志 / Task queue, progress log, metrics, reports, bug fixes, review logs
+├── test/               # 测试 / Tests (227 tests in 36 groups, single test file; includes unit/ and e2e/)
 ├── infra/scripts/      # 自动驾驶引擎、接入流程、健康检查 / Autopilot engine, intake flow, health checks
 │   └── lib/            # 共享工具库 / Shared utilities (ai-runner, autopilot-phases, autopilot-runner, memory, project-setup, utils, notifications, skill-utils)
 ├── codex-bridge/       # Codex CLI 委派模块 / PowerShell module for Codex CLI delegation
@@ -132,7 +132,7 @@ Configured in `.planning/config.json` under `review_strategy`:
 
 | 策略 / Strategy | `mode` 值 / value | 行为 / Behavior |
 |----------|-------------|----------|
-| **自动 / Auto**（默认 / default） | `"auto"` | 审查轮次随项目复杂度自动缩放（5--12） / Review rounds scale with project complexity (5--12) |
+| **自动 / Auto**（默认 / default） | `"auto"` | 审查轮次上限随项目复杂度缩放（5--12），零问题时提前收敛 / Max review rounds scale with project complexity (5--12); converges early when zero issues found |
 | **零缺陷 / Zero-bug** | `"zero_bug"` | 持续审查直到剩余 Bug 低于阈值（默认：3） / Keep reviewing until remaining bugs < threshold (default: 3) |
 | **自定义 / Custom** | `"custom"` | 用户通过 `custom_rounds` 指定精确审查轮次 / User specifies exact number of review rounds via `custom_rounds` |
 
@@ -320,8 +320,8 @@ Tests must cover the entire PRD. The test coverage review builds a coverage matr
 
 其他审查行为 / Additional review behaviors:
 
-- **范围漂移检测（阶段 0）/ Scope Drift Detection (Stage 0)**：任何审查门运行前，自动驾驶检查当前工作是否偏离任务的验收标准。漂移会被标记并在审查前纠正 / Before any review gate runs, the autopilot checks whether the current work has drifted from the task's acceptance criteria. Drift is flagged and corrected before review proceeds
-- **对抗性子 Agent / Adversarial Sub-Agent**：最终审查中，对抗性子 agent 通过测试边界情况、无效输入和未记录假设来尝试破坏交付物。发现进入正常分类管道 / During final review, an adversarial sub-agent attempts to break the deliverable by testing edge cases, invalid inputs, and undocumented assumptions. Findings feed into the normal triage pipeline
+- **范围漂移检测（阶段 0）/ Scope Drift Detection (Stage 0)**：通过 `.ai/recipes/review-code.md` 中的审查指令实现——提示 AI 在正式审查前检查当前工作是否偏离验收标准。这是非阻塞的参考性指令，不是程序化的阻塞检查 / Implemented as a prompt instruction in `.ai/recipes/review-code.md` -- instructs the AI to check for drift from acceptance criteria before formal review. This is a non-blocking advisory instruction, not a programmatic blocking check
+- **对抗性子 Agent / Adversarial Sub-Agent**：通过 `buildFinalReviewPrompt()` 中的 prompt 指令实现——指示 AI 编排者以对抗视角测试边界情况、无效输入和未记录假设。是否实际分派由 AI 编排者自行决定，发现进入正常分类管道 / Implemented as a prompt instruction in `buildFinalReviewPrompt()` -- instructs the AI orchestrator to test edge cases, invalid inputs, and undocumented assumptions from an adversarial perspective. Whether to actually dispatch is at the AI orchestrator's discretion; findings feed into the normal triage pipeline
 - **完成状态协议 / Completion Status Protocol**：每轮审查以四种状态之一结束 / Every review round ends with one of four statuses:
   - `DONE` ——所有检查通过，无问题 / all checks pass, no issues
   - `DONE_WITH_CONCERNS` ——通过但有值得注意的建议性发现 / passes but has advisory findings worth noting
@@ -330,9 +330,9 @@ Tests must cover the entire PRD. The test coverage review builds a coverage matr
 
 ## 最终迭代审查（多 AI 收敛） / Final Iteration Review (Multi-AI Convergence)
 
-当所有任务完成时，自动驾驶进入**最终审查循环**，多个 AI 模型并行审计整个交付物：
+当所有任务完成时，自动驾驶进入**最终审查循环**。脚手架通过 prompt 指令建议 AI 编排者分派多个审查者并行审计交付物——实际的并行分派由 AI 编排者决定和执行，而非脚手架代码直接启动多个进程：
 
-When all tasks complete, the autopilot enters a **final review loop** where multiple AI models audit the entire deliverable in parallel:
+When all tasks complete, the autopilot enters a **final review loop**. The scaffold suggests via prompt instructions that the AI orchestrator dispatch multiple reviewers to audit the deliverable in parallel -- the actual parallel dispatch is decided and executed by the AI orchestrator, not by the scaffold code spawning multiple processes:
 
 ```
 所有任务完成 / All tasks done
@@ -360,9 +360,9 @@ When all tasks complete, the autopilot enters a **final review loop** where mult
 +--------------------------------------+
 ```
 
-每个审查者使用审查 recipe 和开源工具独立运行。Opus 作为分类者——仅 BUG、SECURITY 和 COVERAGE GAP 发现被修复；STYLE 和 FALSE POSITIVE 被跳过。
+每个审查者使用审查 recipe 和开源工具独立运行。Opus 作为分类者——仅 BUG、SECURITY 和 COVERAGE GAP 发现被修复；STYLE 和 FALSE POSITIVE 被跳过。注意：以上并行分派流程是 prompt 指令对 AI 编排者的建议，实际执行取决于 AI 编排者的判断。
 
-Each reviewer operates independently using the review recipes and opensource tools. Opus acts as triage -- only BUG, SECURITY, and COVERAGE GAP findings get fixed; STYLE and FALSE POSITIVE are skipped.
+Each reviewer operates independently using the review recipes and opensource tools. Opus acts as triage -- only BUG, SECURITY, and COVERAGE GAP findings get fixed; STYLE and FALSE POSITIVE are skipped. Note: the parallel dispatch flow above is a prompt-based suggestion to the AI orchestrator; actual execution depends on the AI orchestrator's judgment.
 
 **动态最大轮次 / Dynamic max rounds**（当 `review_strategy.mode` 为 `"auto"` 时）：
 
@@ -462,8 +462,8 @@ When max rounds are reached and unresolved issues remain, the autopilot **pauses
 
 **关键区别 / Key distinctions**:
 - `waiting_quota` 不消耗重试预算——速率限制是预期行为，不是错误 / does not consume the retry budget -- rate limits are expected, not errors
-- `final_review` 并行分派多个 AI 模型进行交叉验证 / dispatches multiple AI models in parallel for cross-validation
-- 当零个新 BUG/SECURITY/COVERAGE GAP 问题被发现时审查循环收敛 / The review loop converges when zero new BUG/SECURITY/COVERAGE GAP issues are found
+- `final_review` 通过 prompt 指令建议 AI 编排者并行分派多个模型交叉验证 / suggests via prompt that the AI orchestrator dispatch multiple models in parallel for cross-validation
+- 审查循环在连续3轮均未发现新 BUG/SECURITY/COVERAGE GAP 问题后收敛 / The review loop converges after 3 consecutive rounds with zero new BUG/SECURITY/COVERAGE GAP issues
 - `awaiting_user_decision` 确保问题持续存在时人类拥有最终决定权 / ensures humans have final say when issues persist after max rounds
 
 **依赖 ID 验证 / Dependency ID validation**：引用未知 ID 的 `depends_on` 条目被警告并视为未满足，而非静默跳过。循环依赖在运行前通过 DFS 图着色检测。
@@ -476,7 +476,7 @@ On timeout, the autopilot uses `taskkill /T /F` to kill the entire process tree,
 
 **Git 安全 / Git safety**：`ensureCleanWorkingTree()` 在每个任务完成后自动提交未暂存的变更。`pushToRemote()` 在所有任务完成时推送。所有 git 命令使用 `spawnSync` 配合参数数组以防止 shell 注入。
 
-`ensureCleanWorkingTree()` auto-commits any unstaged changes after each task completes. `pushToRemote()` pushes when all tasks are done. All git commands use `spawnSync` with argument arrays to prevent shell injection.
+`ensureCleanWorkingTree()` auto-commits any unstaged changes after each task completes. `pushToRemote()` pushes when all tasks are done. All git commands with dynamic values use spawnSync with argument arrays to prevent shell injection; fixed commands use execSync
 
 ## 多运行时支持 / Multi-Runtime Support
 
