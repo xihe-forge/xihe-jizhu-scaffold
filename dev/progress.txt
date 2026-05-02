@@ -1,0 +1,1 @@
+2026-05-02 21:31 CST - Fixed local workspace dependency links for apps/api after package rename: ran pnpm install --force, verified @xihe-jizhu-scaffold/types junction points to packages/types, confirmed old @robust-ai-scaffold scope is gone, and validated api build/dev plus unit tests.

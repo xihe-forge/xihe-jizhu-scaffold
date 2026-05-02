@@ -4,6 +4,10 @@
 
 The scaffold is feature-complete and in use for production projects. Current focus is documentation accuracy and type definition hygiene.
 
+## Latest Maintenance
+
+- 2026-05-02: Refreshed pnpm workspace install after rename to xihe-jizhu package scope. apps/api now links @xihe-jizhu-scaffold/types and @xihe-jizhu-scaffold/shared to local packages, with old @robust-ai-scaffold app node_modules scope removed.
+
 ## Completed Features
 
 - **Multi-AI autopilot orchestration** -- Opus orchestrates; Sonnet, Codex CLI, and Gemini CLI execute via worktree isolation
