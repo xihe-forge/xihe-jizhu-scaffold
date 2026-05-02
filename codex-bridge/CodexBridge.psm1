@@ -447,7 +447,8 @@ $taskContent
                 Write-Host "[codex-bridge] Auto-committing uncommitted Codex changes..." -ForegroundColor Yellow
                 # Remove bridge control files before staging to prevent them leaking into merged branches
                 git rm -f --cached .codex-pid .codex-blockers.md 2>$null
-                git add -A -- . ':!.codex-pid' ':!.codex-blockers.md' 2>$null
+                $gitAddMutexHelper = Join-Path $PSScriptRoot "..\..\xihe-tianshu-harness\domains\software\scripts\git-add-mutex.mjs"
+                & node $gitAddMutexHelper --repo $WorktreePath -- add -A -- . ':!.codex-pid' ':!.codex-blockers.md' 2>$null
                 if ($LASTEXITCODE -ne 0) {
                     Write-Host "[codex-bridge] WARNING: git add failed (exit $LASTEXITCODE)" -ForegroundColor Red
                     $autoCommitOk = $false

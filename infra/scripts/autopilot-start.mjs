@@ -47,6 +47,7 @@ import {
   formatMemoryForPrompt,
   recordTaskOutcome
 } from "./lib/memory.mjs";
+import { runGitAddWithMutex } from "../../../xihe-tianshu-harness/domains/software/scripts/git-add-mutex.mjs";
 
 const args = process.argv.slice(2);
 const isDryRun = args.includes("--dry-run");
@@ -301,8 +302,8 @@ function ensureCleanWorkingTree(taskId, taskName) {
     const status = execSync("git status --porcelain", { encoding: "utf8", timeout: 10000 }).trim();
     if (!status) return; // already clean
 
-    // Auto-stage and commit uncommitted changes (using spawnSync to avoid shell injection)
-    const addResult = spawnSync("git", ["add", "-A"], { timeout: 10000, stdio: "pipe" });
+    // Auto-stage under the portfolio git mutex to avoid concurrent index.lock storms.
+    const addResult = runGitAddWithMutex({ repoPath: process.cwd(), args: ["add", "-A"] });
     if (addResult.status !== 0) {
       console.warn(`⚠ Auto-commit skipped after task ${taskId}: git add failed — manual commit may be needed`);
       return;
